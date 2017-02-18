@@ -1,0 +1,73 @@
+with Interfaces;
+with System;
+with Ada.Streams.Stream_IO;
+with Ada.Assertions;
+with Ada.Unchecked_Conversion;
+with Home_Pictures.Swaps;
+
+package Home_Pictures.PNG_Images is
+
+   --All integers that require more than one byte shall be in network byte order.
+
+   use Ada.Streams.Stream_IO;
+   use Ada.Assertions;
+   use Interfaces;
+   use System;
+
+
+   type PNG_Signature is array (0 .. 7) of Unsigned_8 with Pack;
+   type PNG_Chunk_Kind_Index is range 0 .. 3;
+   type PNG_Chunk_Kind is array (PNG_Chunk_Kind_Index) of Unsigned_8 with Pack;
+   type PNG_Color_Kind is (PNG_Greyscale, PNG_Truecolour, PNG_Indexed_Colour, Greyscale_With_Alpha, Truecolour_With_Alpha);
+   type PNG_Bit_Depth is (PNG_Bit_Depth_1, PNG_Bit_Depth_2, PNG_Bit_Depth_4, PNG_Bit_Depth_8, PNG_Bit_Depth_16);
+
+
+   PNG_Signature_Constant : constant PNG_Signature := (137, 80, 78, 71, 13, 10, 26, 10);
+   IHDR : constant PNG_Chunk_Kind := (73, 72, 68, 82);
+
+
+   type PNG_Header_Chunk is record
+      Chunk_Data_Length : Unsigned_32;
+      Chunk_Kind        : PNG_Chunk_Kind;
+      Width             : Unsigned_32;
+      Height            : Unsigned_32;
+      Bit_Depth         : PNG_Bit_Depth;
+      Color_Kind        : PNG_Color_Kind;
+      Compression       : Unsigned_8;
+      Filter            : Unsigned_8;
+      Interlace         : Unsigned_8;
+      Chunk_CRC         : Unsigned_32;
+   end record with Pack;
+
+
+   type PNG is record
+      Signature : PNG_Signature;
+      Header : PNG_Header_Chunk;
+   end record;
+
+   procedure Read_Image (Streamer : Stream_Access; Data : in out PNG);
+
+private
+
+   for PNG_Color_Kind'Size use 8;
+   for PNG_Color_Kind use
+     (
+      PNG_Greyscale => 0,
+      PNG_Truecolour => 2,
+      PNG_Indexed_Colour => 3,
+      Greyscale_With_Alpha => 4,
+      Truecolour_With_Alpha => 6
+     );
+
+   for PNG_Bit_Depth'Size use 8;
+   for PNG_Bit_Depth use
+     (
+      PNG_Bit_Depth_1 => 1,
+      PNG_Bit_Depth_2 => 2,
+      PNG_Bit_Depth_4 => 4,
+      PNG_Bit_Depth_8 => 8,
+      PNG_Bit_Depth_16 => 16
+     );
+
+
+end;
