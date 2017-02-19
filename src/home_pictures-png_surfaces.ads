@@ -5,7 +5,7 @@ with Ada.Assertions;
 with Ada.Unchecked_Conversion;
 with Home_Pictures.Swaps;
 
-package Home_Pictures.PNG_Images is
+package Home_Pictures.PNG_Surfaces is
 
    --All integers that require more than one byte shall be in network byte order.
 
@@ -22,8 +22,8 @@ package Home_Pictures.PNG_Images is
    type PNG_Bit_Depth is (PNG_Bit_Depth_1, PNG_Bit_Depth_2, PNG_Bit_Depth_4, PNG_Bit_Depth_8, PNG_Bit_Depth_16);
 
 
-   PNG_Signature_Constant : constant PNG_Signature := (137, 80, 78, 71, 13, 10, 26, 10);
-   IHDR : constant PNG_Chunk_Kind := (73, 72, 68, 82);
+
+
 
 
    type PNG_Header_Chunk is record
@@ -40,12 +40,12 @@ package Home_Pictures.PNG_Images is
    end record with Pack;
 
 
-   type PNG is record
+   type PNG_Surface is record
       Signature : PNG_Signature;
       Header : PNG_Header_Chunk;
    end record;
 
-   procedure Read_Image (Streamer : Stream_Access; Data : in out PNG);
+   procedure Read_Image (Streamer : Stream_Access; Surface : in out PNG_Surface);
 
 private
 

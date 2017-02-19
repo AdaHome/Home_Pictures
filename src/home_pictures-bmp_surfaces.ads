@@ -3,23 +3,21 @@ with System;
 with Ada.Streams.Stream_IO;
 with Ada.Assertions;
 
-package Home_Pictures.BMP_Images is
+package Home_Pictures.BMP_Surfaces is
 
    use Ada.Streams.Stream_IO;
    use Ada.Assertions;
    use Interfaces;
    use System;
 
-   type Compression is (None_Compression, Run_Length_Encoding_8_Compression);
-   for Compression'Size use 32;
-   for Compression use (None_Compression => 0, Run_Length_Encoding_8_Compression => 1);
+   type BMP_Compression is (None_Compression, Run_Length_Encoding_8_Compression);
 
-   type Signature is (BM_Signature);
-   for Signature'Size use 16;
-   for Signature use (BM_Signature => 16#4D42#);
 
-   type File_Header is record
-      Sign       : Signature;
+   type BMP_Signature is (BMP_BM_Signature);
+
+
+   type BMP_File_Header is record
+      Sign       : BMP_Signature;
       Size       : Unsigned_32; -- File size in bytes
       Reserved_1 : Unsigned_16;
       Reserved_2 : Unsigned_16;
@@ -31,13 +29,13 @@ package Home_Pictures.BMP_Images is
    -- DIB header
    -- BITMAPINFOHEADER structure
    -- https://msdn.microsoft.com/en-us/library/windows/desktop/dd183376(v=vs.85).aspx
-   type Information_Header is record
+   type BMP_Information_Header is record
       Header_Size           : Unsigned_32; -- Number of bytes in the DIB header (from this point)
       Width                 : Unsigned_32; -- Image width in pixels
       Height                : Unsigned_32; -- Image hieght in pixels
       Plane_Count           : Unsigned_16; -- Number of color planes being used
       Pixel_Size            : Unsigned_16; -- Bits per pixel. must be in (0 | 1 | 2 | 4 | 8 | 16 | 24 | 32).
-      Compress              : Compression;
+      Compress              : BMP_Compression;
       Image_Size            : Unsigned_32; -- Size of the image data in bytes
       Horizontal_Resolution : Unsigned_32; -- Pixels per meter in horizontal axis
       Vertical_Resolution   : Unsigned_32; -- Pixels per meter in vertical axis
@@ -49,13 +47,13 @@ package Home_Pictures.BMP_Images is
 
 
 
-   type Information_Header_V5 is record
+   type BMP_Information_Header_V5 is record
       Header_Size           : Unsigned_32; -- Number of bytes in the DIB header (from this point)
       Width                 : Unsigned_32; -- Image width in pixels
       Height                : Unsigned_32; -- Image hieght in pixels
       Plane_Count           : Unsigned_16; -- Number of color planes being used
       Pixel_Size            : Unsigned_16; -- Bits per pixel
-      Compress              : Compression;
+      Compression           : BMP_Compression;
       Image_Size            : Unsigned_32; -- Size of the image data in bytes
       Horizontal_Resolution : Unsigned_32; -- Pixels per meter in horizontal axis
       Vertical_Resolution   : Unsigned_32; -- Pixels per meter in vertical axis
@@ -85,27 +83,34 @@ package Home_Pictures.BMP_Images is
    end record;
 
 
-   type BMP_Header is record
-      File        : File_Header;
-      Information : Information_Header;
+   type BMP_Surface is record
+      File        : BMP_File_Header;
+      Information : BMP_Information_Header;
    end record with Pack;
 
-   type BMP_Header_V5 is record
-      File        : File_Header;
-      Information : Information_Header_V5;
+   type BMP_Surface_V5 is record
+      File        : BMP_File_Header;
+      Information : BMP_Information_Header_V5;
    end record;
 
-   type Pixel_RGB is (Red, Green, Blue);
-   type Pixel_RGBA is (Red, Green, Blue, Alpha);
-   subtype Component_8 is Unsigned_8;
+   type BMP_Pixel_RGB is (Red, Green, Blue);
+   type BMP_Pixel_RGBA is (Red, Green, Blue, Alpha);
+   subtype BMP_Component_8 is Unsigned_8;
 
    -- 0 .. 255 = black .. white
-   subtype Pixel_8_Grayscale is Component_8;
+   subtype BMP_Pixel_8_Grayscale is BMP_Component_8;
 
-   type Pixel_24_RGB is array (Pixel_RGB) of Component_8;
-   type Pixel_32_RGBA is array (Pixel_RGBA) of Component_8;
+   type BMP_Pixel_24_RGB is array (BMP_Pixel_RGB) of BMP_Component_8;
+   type BMP_Pixel_32_RGBA is array (BMP_Pixel_RGBA) of BMP_Component_8;
 
 
-   procedure Read_Image (Streamer : Stream_Access; Data : out BMP_Header);
+   procedure Read_Image (Streamer : Stream_Access; Surface : out BMP_Surface);
 
+
+private
+
+   for BMP_Compression'Size use 32;
+   for BMP_Compression use (None_Compression => 0, Run_Length_Encoding_8_Compression => 1);
+   for BMP_Signature'Size use 16;
+   for BMP_Signature use (BMP_BM_Signature => 16#4D42#);
 end;

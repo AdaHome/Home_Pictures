@@ -1,9 +1,9 @@
 with GL.C;
 
 
-package body Home_Pictures.BMP_Images.GL_Compatible is
+package body Home_Pictures.BMP_Surfaces.GL_Compatible is
 
-   procedure Read_Image (Filename : String; Tex : GL.Textures.Texture; Header : in out BMP_Header; Data : out System.Storage_Elements.Storage_Array) is
+   procedure Read_Image (Filename : String; Tex : GL.Textures.Texture; Surface : in out BMP_Surface; Data : out System.Storage_Elements.Storage_Array) is
       use Ada.Streams.Stream_IO;
       Format : GL.Textures.Pixel_Format := GL.Textures.RGB_Pixel_Format;
       Pixel_Kind : GL.Textures.Pixel_Type;
@@ -14,19 +14,19 @@ package body Home_Pictures.BMP_Images.GL_Compatible is
    begin
       Open (File, In_File, Filename);
       Streamer := Stream (File);
-      BMP_Header'Read (Streamer, Header);
+      BMP_Surface'Read (Streamer, Surface);
 
-      Width := GL.C.GLsizei (Header.Information.Width);
-      Height := GL.C.GLsizei (Header.Information.Height);
+      Width := GL.C.GLsizei (Surface.Information.Width);
+      Height := GL.C.GLsizei (Surface.Information.Height);
 
-      case Header.Information.Pixel_Size is
+      case Surface.Information.Pixel_Size is
       when 8 =>
          Pixel_Kind := GL.Textures.Byte_Pixel_Type;
       when others =>
          raise Program_Error with "Unsupported Pixel_Size";
       end case;
 
-      Assert (Header.Information.Compress = None_Compression, "Unsupported compression");
+      Assert (Surface.Information.Compress = None_Compression, "Unsupported compression");
 
 --        case Header.Information.Color_Count is
 --        when 1 =>

@@ -3,10 +3,10 @@ with Ada.Strings.Fixed;
 with Ada.Integer_Text_IO;
 with Interfaces;
 
-package body Home_Pictures.PNG_Images.Puts is
+package body Home_Pictures.PNG_Surfaces.Puts is
 
 
-   procedure Put_Lines (Item : PNG) is
+   procedure Put_Lines (Surface : PNG_Surface) is
       use Ada.Text_IO;
       use Ada.Integer_Text_IO;
       use Ada.Strings.Fixed;
@@ -26,35 +26,35 @@ package body Home_Pictures.PNG_Images.Puts is
 
 
       Put (Head ("Signature", Column_1_Width));
-      for E : Unsigned_8 of Item.Signature loop
+      for E : Unsigned_8 of Surface.Signature loop
         Put (Standard_Output, E, 0, 10); Put (" ");
       end loop;
       New_Line;
 
       Put (Head("Data_Length ", Column_1_Width));
-      Put (Item.Header.Chunk_Data_Length, Column_2_Width);
+      Put (Surface.Header.Chunk_Data_Length, Column_2_Width);
       New_Line;
 
       Put (Head ("Chunk_Kind", Column_1_Width));
-      for E : Unsigned_8 of Item.Header.Chunk_Kind loop
+      for E : Unsigned_8 of Surface.Header.Chunk_Kind loop
         Put (Standard_Output, E, 0, 10); Put (" ");
       end loop;
       New_Line;
 
       Put (Head("Width ", Column_1_Width));
-      Put (Item.Header.Width, Column_2_Width);
+      Put (Surface.Header.Width, Column_2_Width);
       New_Line;
 
       Put (Head("Height", Column_1_Width));
-      Put (Item.Header.Height, Column_2_Width);
+      Put (Surface.Header.Height, Column_2_Width);
       New_Line;
 
       Put (Head("Bit_Depth", Column_1_Width));
-      Put (Tail (Item.Header.Bit_Depth'Img, Column_2_Width));
+      Put (Tail (Surface.Header.Bit_Depth'Img, Column_2_Width));
       New_Line;
 
       Put (Head("Color_Kind", Column_1_Width));
-      Put (Tail (Item.Header.Color_Kind'Img, Column_2_Width));
+      Put (Tail (Surface.Header.Color_Kind'Img, Column_2_Width));
       New_Line;
 
 
