@@ -23,11 +23,7 @@ package Home_Pictures.PNG_Surfaces is
 
 
 
-
-
-
-   type PNG_Header_Chunk is record
-      Chunk_Data_Length : Unsigned_32;
+   type PNG_Chunk_IHDR is record
       Chunk_Kind        : PNG_Chunk_Kind;
       Width             : Unsigned_32;
       Height            : Unsigned_32;
@@ -36,13 +32,12 @@ package Home_Pictures.PNG_Surfaces is
       Compression       : Unsigned_8;
       Filter            : Unsigned_8;
       Interlace         : Unsigned_8;
-      Chunk_CRC         : Unsigned_32;
-   end record with Pack;
+   end record;
 
 
    type PNG_Surface is record
       Signature : PNG_Signature;
-      Header : PNG_Header_Chunk;
+      Chunk_IHDR : PNG_Chunk_IHDR;
    end record;
 
    procedure Read_Image (Streamer : Stream_Access; Surface : in out PNG_Surface);
