@@ -49,15 +49,24 @@ package body Home_Pictures.PNG_Surfaces is
       return Get_Value (C);
    end;
 
-
+   -- http://www.libpng.org/pub/png/spec/1.2/PNG-Structure.html#PNG-file-signature
    procedure Read_Signature (Streamer : Stream_Access) is
+      type PNG_Signature is array (0 .. 7) of Unsigned_8 with Pack;
+      --This signature indicates that the remainder of the file contains a single PNG image.
       Signature : PNG_Signature;
+      -- The first eight bytes of a PNG file always contain the following (decimal) values:
+      --     (decimal)              137  80  78  71  13  10  26  10
+      --     (hexadecimal)           89  50  4e  47  0d  0a  1a  0a
+      --     (ASCII C notation)    \211   P   N   G  \r  \n \032 \n
       Signature_Constant : constant PNG_Signature := (137, 80, 78, 71, 13, 10, 26, 10);
    begin
       -- The first 4 bytes must be a PNG signature.
       PNG_Signature'Read (Streamer, Signature);
       Assert (Signature = Signature_Constant, "The signature does not match a PNG signature");
    end;
+
+
+
 
    procedure Read_First (Streamer : Stream_Access; Item : in out PNG_Chunk_IHDR) is
       use Home_Pictures.Swaps;
@@ -80,6 +89,8 @@ package body Home_Pictures.PNG_Surfaces is
       Update (C, Kind);
       Update (C, Item);
       Assert (Get_Value (C) = Checksum);
+      Item.Width := Bswap_32 (Item.Width);
+      Item.Height := Bswap_32 (Item.Height);
    end Read_First;
 
 
