@@ -3,9 +3,9 @@ with Ada.Strings.Fixed;
 with Ada.Integer_Text_IO;
 with Interfaces;
 
-package body Home_Pictures.BMP_Surfaces.Puts is
+package body Home_Pictures.BMP.Puts is
 
-   procedure Put_Lines (Surface : BMP_Surface) is
+   procedure Put_Lines (Surface : BMP_Information) is
       use Ada.Text_IO;
       use Ada.Integer_Text_IO;
       use Ada.Strings.Fixed;
@@ -75,7 +75,7 @@ package body Home_Pictures.BMP_Surfaces.Puts is
 
 
 
-   procedure Put_Lines (Surface : BMP_Surface_V5) is
+   procedure Put_Lines (Surface : BMP_Information_V5) is
       use Ada.Text_IO;
       use Ada.Integer_Text_IO;
       use Ada.Strings.Fixed;
@@ -88,8 +88,8 @@ package body Home_Pictures.BMP_Surfaces.Puts is
       Column_2_Width : constant := 20;
 
    begin
-      Put (Head ("BMP_Surface'Size / Storage_Unit", Column_1_Width));
-      Put (Integer (BMP_Surface'Size / Storage_Unit), Column_2_Width);
+      Put (Head ("BMP_Information'Size / Storage_Unit", Column_1_Width));
+      Put (Integer (BMP_Information'Size / Storage_Unit), Column_2_Width);
       New_Line;
 
 

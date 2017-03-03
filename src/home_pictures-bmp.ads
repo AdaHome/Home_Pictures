@@ -3,7 +3,7 @@ with System;
 with Ada.Streams.Stream_IO;
 with Ada.Assertions;
 
-package Home_Pictures.BMP_Surfaces is
+package Home_Pictures.BMP is
 
    use Ada.Streams.Stream_IO;
    use Ada.Assertions;
@@ -83,12 +83,12 @@ package Home_Pictures.BMP_Surfaces is
    end record;
 
 
-   type BMP_Surface is record
+   type BMP_Information is record
       File        : BMP_File_Header;
       Information : BMP_Information_Header;
    end record with Pack;
 
-   type BMP_Surface_V5 is record
+   type BMP_Information_V5 is record
       File        : BMP_File_Header;
       Information : BMP_Information_Header_V5;
    end record;
@@ -104,7 +104,7 @@ package Home_Pictures.BMP_Surfaces is
    type BMP_Pixel_32_RGBA is array (BMP_Pixel_RGBA) of BMP_Component_8;
 
 
-   procedure Read_Image (Streamer : Stream_Access; Surface : out BMP_Surface);
+   procedure Read_Image (Streamer : Stream_Access; Surface : out BMP_Information);
 
 
 private

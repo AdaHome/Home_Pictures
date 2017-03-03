@@ -5,7 +5,7 @@ with Ada.Text_IO; use Ada.Text_IO;
 
 -- http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
 
-package body Home_Pictures.PNG_Surfaces is
+package body Home_Pictures.PNG is
 
    procedure Put (Item : Stream_Element_Array) is
       use Ada.Text_IO;
@@ -15,7 +15,7 @@ package body Home_Pictures.PNG_Surfaces is
       end loop;
    end Put;
 
-   function Create_Chunk_Kind (Item : String) return PNG_Chunk_Kind is
+   function Create_Chunk_Kind (Item : PNG_Chunk_Kind_Name) return PNG_Chunk_Kind is
       R : PNG_Chunk_Kind;
    begin
       Assert (Item'Length = 4);
@@ -68,30 +68,45 @@ package body Home_Pictures.PNG_Surfaces is
 
 
 
-   procedure Read_First (Streamer : Stream_Access; Item : in out PNG_Chunk_IHDR) is
+   procedure Read_First_Chunk (Streamer : Stream_Access; Item : in out PNG_Chunk_IHDR) is
       use Home_Pictures.Swaps;
       use GNAT.CRC32;
       Kind : PNG_Chunk_Kind;
       Kind_IHDR : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IHDR");
       Length : Unsigned_32;
       Checksum : Unsigned_32;
-      C : CRC32;
+      Calculated_Checksum : CRC32;
    begin
       Unsigned_32'Read (Streamer, Length);
       Length := Bswap_32 (Length);
+      -- All integers that require more than one byte must be in network byte order
+
       Assert (Length = 13, "First chunk is not 13 bytes.");
+
       PNG_Chunk_Kind'Read (Streamer, Kind);
       Assert (Kind = Kind_IHDR, "IHDR is not first.");
+      -- IHDR must appear first.
+
       PNG_Chunk_IHDR'Read (Streamer, Item);
+
       Unsigned_32'Read (Streamer, Checksum);
       Checksum := Bswap_32 (Checksum);
-      Initialize (C);
-      Update (C, Kind);
-      Update (C, Item);
-      Assert (Get_Value (C) = Checksum);
+      -- All integers that require more than one byte must be in network byte order
+
+      Initialize (Calculated_Checksum);
+      Update (Calculated_Checksum, Kind);
+      Update (Calculated_Checksum, Item);
+      -- A 4-byte CRC (Cyclic Redundancy Check) calculated on the preceding bytes in the chunk,
+      -- including the chunk type code and chunk data fields, but not including the length field
+
+      Assert (Get_Value (Calculated_Checksum) = Checksum, "Checksum does not match.");
+
+
       Item.Width := Bswap_32 (Item.Width);
       Item.Height := Bswap_32 (Item.Height);
-   end Read_First;
+      -- All integers that require more than one byte must be in network byte order
+
+   end;
 
 
    procedure Read_Chunk (Streamer : Stream_Access; Chunk : in out PNG_Chunk) is
@@ -100,7 +115,10 @@ package body Home_Pictures.PNG_Surfaces is
    begin
       Unsigned_32'Read (Streamer, Chunk.Length);
       Chunk.Length := Bswap_32 (Chunk.Length);
+      -- All integers that require more than one byte must be in network byte order
+
       PNG_Chunk_Kind'Read (Streamer, Chunk.Kind);
+
       if Chunk.Length > 0 then
          declare
             subtype R is Stream_Element_Offset range 0 .. Stream_Element_Offset (Chunk.Length - 1);
@@ -112,27 +130,43 @@ package body Home_Pictures.PNG_Surfaces is
       else
          Chunk.Data := null;
       end if;
+      -- Allocate new space for the chunk given chunk length.
+
       Unsigned_32'Read (Streamer, Chunk.Checksum);
       Chunk.Checksum := Bswap_32 (Chunk.Checksum);
+      -- All integers that require more than one byte must be in network byte order
+
       Assert (Calc_Checksum (Chunk) = Chunk.Checksum, "Checksum does not match");
    end;
 
 
 
-   procedure Read (Streamer : Stream_Access; Item : in out PNG_Surface) is
+   procedure Read (Streamer : Stream_Access; Item : in out PNG_Information) is
       use type Ada.Containers.Count_Type;
-      Kind_IEND : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IEND");
+      Chunk_Kind_IEND : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IEND");
+      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
    begin
       Read_Signature (Streamer);
-      Read_First (Streamer, Item.Chunk_IHDR);
+      --The first eight bytes of a PNG file always contain the PNG signature.
+
+      Read_First_Chunk (Streamer, Item.Chunk_IHDR);
+      -- IHDR must appear first.
+
+      Item.Chunk_Count := Item.Chunk_Count + 1;
+
       declare
          C : PNG_Chunk;
       begin
          loop
             Read_Chunk (Streamer, C);
-            Item.Chunk_List.Append (C);
-            exit when C.Kind = Kind_IEND;
-            Assert (Item.Chunk_List.Length < 10, "Prevention against infinite loop.");
+            Item.Chunk_Count := Item.Chunk_Count + 1;
+            if C.Kind = Chunk_Kind_IDAT then
+               Item.Chunk_IDAT_List.Append (C);
+            else
+               Item.Chunk_Unkown_List.Append (C);
+            end if;
+            exit when C.Kind = Chunk_Kind_IEND;
+            Assert (Item.Chunk_Count < 10, "Max chunk count reached, no more chunk can be read. This is just a protection against infinite loop.");
          end loop;
       end;
    end Read;
