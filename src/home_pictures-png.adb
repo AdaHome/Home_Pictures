@@ -7,12 +7,10 @@ with Ada.Text_IO; use Ada.Text_IO;
 
 package body Home_Pictures.PNG is
 
-   function Create_Chunk_Kind (Item : PNG_Chunk_Kind_String) return PNG_Chunk_Kind is
-      R : PNG_Chunk_Kind;
+   function Create_Chunk_Kind_32 (Item : PNG_Chunk_Kind_String) return Unsigned_32 is
+      R : Unsigned_32 with Address => Item'Address;
+      --N : Unsigned_32 := Home_Pictures.Swaps.Bswap_32 (R);
    begin
-      for I in 0 .. 3 loop
-         R (R'First + Stream_Element_Offset (I)) := Character'Pos (Item (Item'First + I));
-      end loop;
       return R;
    end;
 
@@ -22,6 +20,17 @@ package body Home_Pictures.PNG is
       GNAT.CRC32.Update (Item, B);
    end Update;
 
+   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : Unsigned_32) is
+      B : Stream_Element_Array (0 .. 3) with Address => Value'Address;
+   begin
+      GNAT.CRC32.Update (Item, B);
+   end Update;
+
+   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Chunk_Kind) is
+      B : Stream_Element_Array (0 .. 3) with Address => Value'Address;
+   begin
+      GNAT.CRC32.Update (Item, B);
+   end Update;
 
    procedure Read (Streamer : Stream_Access; Item : out Unsigned_32) is
    begin
@@ -32,15 +41,20 @@ package body Home_Pictures.PNG is
       -- descending order of significance (MSB LSB for two-byte integers, B3 B2 B1 B0 for four-byte integers).
       -- The highest bit (value 128) of a byte is numbered bit 7; the lowest bit (value 1) is numbered bit 0.
       -- Values are unsigned unless otherwise noted. Values explicitly noted as signed are represented in two's complement notation.
-   end Read;
+   end;
+
+   procedure Read_Chunk_Kind (Streamer : Stream_Access; Kind : out PNG_Chunk_Kind; Calculated_Checksum : in out GNAT.CRC32.CRC32) is
+   begin
+      PNG_Chunk_Kind'Read (Streamer, Kind);
+      Update (Calculated_Checksum, Kind);
+   end;
 
 
    procedure Read_Chunk_Begin (Streamer : Stream_Access; Length : out Unsigned_32; Kind : out PNG_Chunk_Kind; Calculated_Checksum : out GNAT.CRC32.CRC32) is
    begin
-      Read (Streamer, Length);
-      PNG_Chunk_Kind'Read (Streamer, Kind);
       GNAT.CRC32.Initialize (Calculated_Checksum);
-      GNAT.CRC32.Update (Calculated_Checksum, Kind);
+      Read (Streamer, Length);
+      Read_Chunk_Kind (Streamer, Kind, Calculated_Checksum);
       -- A 4-byte CRC (Cyclic Redundancy Check) calculated on the preceding bytes in the chunk,
       -- including the chunk type code and chunk data fields, but not including the length field.
    end;
@@ -49,10 +63,10 @@ package body Home_Pictures.PNG is
    procedure Read_Chunk_End (Streamer : Stream_Access; Calculated_Checksum : GNAT.CRC32.CRC32) is
       Checksum : Unsigned_32;
    begin
+      --Unsigned_32'Read (Streamer, Checksum);
       Read (Streamer, Checksum);
       Assert (GNAT.CRC32.Get_Value (Calculated_Checksum) = Checksum, "Checksum does not match.");
    end;
-
 
 
    procedure Read_Signature (Streamer : Stream_Access) is
@@ -70,19 +84,18 @@ package body Home_Pictures.PNG is
    end;
 
 
-
-
    procedure Read_First_Chunk (Streamer : Stream_Access; Item : in out PNG_Chunk_Data_IHDR) is
       use Home_Pictures.Swaps;
       use GNAT.CRC32;
       Kind : PNG_Chunk_Kind;
-      Kind_IHDR : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IHDR");
+      --Kind_IHDR : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IHDR");
       Length : Unsigned_32;
       Calculated_Checksum : CRC32;
    begin
       Read_Chunk_Begin (Streamer, Length, Kind, Calculated_Checksum);
+      Put_Line ("Kind'Img " & Kind'Img);
       Assert (Length = 13, "The first chunk length is invalid. First chunk must be 13 bytes long. This chunk length is" & Length'Img & "bytes long.");
-      Assert (Kind = Kind_IHDR, "The first chunk kind is invalid. The chunk kind must be IHDR. This chunk kind is" & Kind (Kind'First)'Img & ".");
+      Assert (Kind = PNG_Chunk_Kind_IHDR, "The first chunk kind is invalid. The chunk kind must be IHDR. This chunk kind is" & Kind'Img & ".");
       -- The PNG_Chunk_Data_IHDR must appear first and be 13 bytes.
       -- These assertion fails if the PNG stream is corrupted.
 
@@ -122,11 +135,8 @@ package body Home_Pictures.PNG is
    end;
 
 
-
    procedure Read (Streamer : Stream_Access; Item : in out PNG_Information) is
       use type Ada.Containers.Count_Type;
-      Chunk_Kind_IEND : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IEND");
-      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
    begin
       Read_Signature (Streamer);
 
@@ -141,19 +151,16 @@ package body Home_Pictures.PNG is
          loop
             Read_Chunk (Streamer, C);
             Item.Chunk_Count := Item.Chunk_Count + 1;
-            if C.Kind = Chunk_Kind_IDAT then
+            if C.Kind = PNG_Chunk_Kind_IDAT then
                Item.Chunk_IDAT_List.Append (C);
             else
                Item.Chunk_Unkown_List.Append (C);
             end if;
-            exit when C.Kind = Chunk_Kind_IEND;
+            exit when C.Kind = PNG_Chunk_Kind_IEND;
             Assert (Item.Chunk_Count < 10, "Max chunk count reached, no more chunk can be read. This is just a protection against infinite loop.");
          end loop;
       end;
-
-
    end Read;
-
 
 
 

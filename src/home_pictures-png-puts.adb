@@ -2,7 +2,7 @@ with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Strings.Fixed;
 with Ada.Integer_Text_IO;
 with Ada.Streams.Stream_IO;
-
+with Ada.Containers.Vectors;
 with Interfaces;
 
 with Zip;
@@ -24,14 +24,58 @@ package body Home_Pictures.PNG.Puts is
 
 
 
-   procedure Put_Kinds is
-      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
-      Chunk_Kind_IEND : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IEND");
-      Chunk_Kind_IDAT_32 : Unsigned_32 with Address => Chunk_Kind_IDAT'Address;
-      Chunk_Kind_IEND_32 : Unsigned_32 with Address => Chunk_Kind_IEND'Address;
+   procedure Put_Kind_Static_Expression is
+      function "<" (A, B : PNG_Chunk_Kind_String) return Boolean is
+      begin
+         return Create_Chunk_Kind_32 (A) < Create_Chunk_Kind_32 (B);
+      end "<";
+      package PNG_Chunk_Kind_String_Vectors is new Ada.Containers.Vectors (Natural, PNG_Chunk_Kind_String);
+      package PNG_Chunk_Kind_String_Vectors_Sorting is new PNG_Chunk_Kind_String_Vectors.Generic_Sorting;
+
+      Pre_Name : constant String := "PNG_Chunk_Kind";
+
+      List : PNG_Chunk_Kind_String_Vectors.Vector;
+
    begin
-      Put_Line ("Chunk_Kind_IEND_32 " & Chunk_Kind_IDAT_32'Img);
-      Put_Line ("Chunk_Kind_IEND_32 " & Chunk_Kind_IEND_32'Img);
+
+      for E of Chunk_Kind_List loop
+         PNG_Chunk_Kind_String_Vectors.Append (List, E);
+      end loop;
+
+
+      PNG_Chunk_Kind_String_Vectors_Sorting.Sort (List);
+
+      Put ("type ");
+      Put (Pre_Name);
+      Put (" is (");
+      for E of List loop
+         Put (Pre_Name);
+         Put ("_");
+         Put (E);
+         exit when E = List.Last_Element;
+         Put (", ");
+      end loop;
+      Put (");");
+
+      New_Line;
+
+      Put ("for ");
+      Put (Pre_Name);
+      Put (" use");
+      New_Line;
+      Put_Line ("(");
+      for E of List loop
+         Put (Pre_Name);
+         Put ("_");
+         Put (E);
+         Put (" =>");
+         Put (Create_Chunk_Kind_32 (E)'Img);
+         exit when E = List.Last_Element;
+         Put (",");
+         New_Line;
+      end loop;
+      New_Line;
+      Put_Line (");");
    end;
 
    procedure Put (Item : Stream_Element_Array) is
@@ -91,18 +135,18 @@ package body Home_Pictures.PNG.Puts is
       use Unsigned_8_Text_IO;
       Column_1_Width : constant := 25;
       Column_2_Width : constant := 20;
-      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
+      --Chunk_Kind_IDAT : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("IDAT");
    begin
       Put_Column ("Length ");
       Put (Item.Length, Column_2_Width);
       New_Line;
-      Put_Column ("Kind ");
-      Put_Stream_Element_Array (Item.Kind, Column_2_Width);
-      New_Line;
+      --Put_Column ("Kind ");
+      --Put_Stream_Element_Array (Item.Kind, Column_2_Width);
+      --New_Line;
 
-      if Item.Kind = Chunk_Kind_IDAT then
-         Put_IDAT (Item.Data.all);
-      end if;
+--        if Item.Kind = Chunk_Kind_IDAT then
+--           Put_IDAT (Item.Data.all);
+--        end if;
    end Put;
 
    procedure Put (Item : PNG_Chunk_Vector) is
@@ -193,27 +237,28 @@ package body Home_Pictures.PNG.Puts is
 
    procedure Put_Image (Item : PNG_Information) is
       use Ada.Text_IO;
-      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
-      Chunk_Kind_gAMA : constant PNG_Chunk_Kind := Create_Chunk_Kind ("gAMA");
-      Chunk_Kind_pHYs : constant PNG_Chunk_Kind := Create_Chunk_Kind ("pHYs");
+--        Chunk_Kind_IDAT : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("IDAT");
+--        Chunk_Kind_gAMA : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("gAMA");
+--        Chunk_Kind_pHYs : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("pHYs");
    begin
-      for E of Item.Chunk_Unkown_List loop
-         if E.Kind = Chunk_Kind_IDAT then
-            Put_Line ("IDAT:");
-            Put_Image (E.Data.all);
-            New_Line;
-            Put_IDAT (E.Data.all);
-            New_Line;
-         elsif E.Kind = Chunk_Kind_gAMA then
-            Put_Line ("gAMA");
-            Put_Image (E.Data.all);
-            New_Line;
-         elsif E.Kind = Chunk_Kind_pHYs then
-            Put_Line ("pHYs");
-            Put_Image (E.Data.all);
-            New_Line;
-         end if;
-      end loop;
+--        for E of Item.Chunk_Unkown_List loop
+--           if E.Kind = Chunk_Kind_IDAT then
+--              Put_Line ("IDAT:");
+--              Put_Image (E.Data.all);
+--              New_Line;
+--              Put_IDAT (E.Data.all);
+--              New_Line;
+--           elsif E.Kind = Chunk_Kind_gAMA then
+--              Put_Line ("gAMA");
+--              Put_Image (E.Data.all);
+--              New_Line;
+--           elsif E.Kind = Chunk_Kind_pHYs then
+--              Put_Line ("pHYs");
+--              Put_Image (E.Data.all);
+--              New_Line;
+--           end if;
+--        end loop;
+      null;
    end;
 
 end;
