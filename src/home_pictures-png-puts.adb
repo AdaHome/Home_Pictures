@@ -47,14 +47,18 @@ package body Home_Pictures.PNG.Puts is
 
       Put ("type ");
       Put (Pre_Name);
-      Put (" is (");
+      Put (" is ");
+      New_Line;
+      Put_Line ("(");
       for E of List loop
          Put (Pre_Name);
          Put ("_");
          Put (E);
          exit when E = List.Last_Element;
          Put (", ");
+         New_Line;
       end loop;
+      New_Line;
       Put (");");
 
       New_Line;
