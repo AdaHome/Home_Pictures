@@ -1,9 +1,13 @@
 with GL.C;
 
-
 package body Home_Pictures.BMP.GL_Compatible is
 
-   procedure Read_Image (Filename : String; Tex : GL.Textures.Texture; Surface : in out BMP_Information; Data : out System.Storage_Elements.Storage_Array) is
+   procedure Read_Image
+     (Filename : String;
+      Tex : GL.Textures.Texture;
+      Surface : in out BMP_Information;
+      Data : out Ada.Streams.Stream_Element_Array)
+   is
       use Ada.Streams.Stream_IO;
       Format : GL.Textures.Pixel_Format := GL.Textures.RGB_Pixel_Format;
       Pixel_Kind : GL.Textures.Pixel_Type;

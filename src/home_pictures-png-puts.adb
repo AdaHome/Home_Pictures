@@ -1,18 +1,75 @@
-with Ada.Text_IO;
+with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Strings.Fixed;
 with Ada.Integer_Text_IO;
 with Ada.Streams.Stream_IO;
-with Interfaces;
-with LZ77;
 
+with Interfaces;
+
+with Zip;
+with Zip_Streams;
+
+with Home_Streams.Memory_Overlays;
 
 package body Home_Pictures.PNG.Puts is
 
    package Unsigned_32_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_32);
    package Unsigned_16_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_16);
    package Unsigned_8_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_8);
+   package PNG_Pixel_Count_Text_IO is new Ada.Text_IO.Modular_IO (PNG_Pixel_Count);
+   package PNG_Bit_Depth_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Bit_Depth);
+   package PNG_Color_Kind_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Color_Kind);
+   package PNG_Interlace_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Interlace);
+   package PNG_Filter_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Filter);
+   package PNG_Compression_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Compression);
 
 
+
+   procedure Put_Kinds is
+      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
+      Chunk_Kind_IEND : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IEND");
+      Chunk_Kind_IDAT_32 : Unsigned_32 with Address => Chunk_Kind_IDAT'Address;
+      Chunk_Kind_IEND_32 : Unsigned_32 with Address => Chunk_Kind_IEND'Address;
+   begin
+      Put_Line ("Chunk_Kind_IEND_32 " & Chunk_Kind_IDAT_32'Img);
+      Put_Line ("Chunk_Kind_IEND_32 " & Chunk_Kind_IEND_32'Img);
+   end;
+
+   procedure Put (Item : Stream_Element_Array) is
+      use Ada.Text_IO;
+   begin
+      for E of Item loop
+         Put (Character'Val (E));
+      end loop;
+   end Put;
+
+   procedure Put_IDAT (Item : Stream_Element_Array) is
+      -- I'm trying to inflate uncompress IDAT data here.
+      -- Then print out the uncompressed data.
+      -- If the values look right I will add code to render the uncompressed data as OpenGL texture.
+      --use Home_Streams.Memory_Overlays;
+      --O : Overlay_Memory_Stream := Create (Item'Address, Item'Length);
+      --Z : Zip.Zip_info;
+   begin
+
+      --Zip.Load (Z, Zip_Streams.Root_Zipstream_Type (Stream (O).all));
+      --Put_Line ("Is_loaded " & Zip.Is_loaded (Z)'Img);
+      null;
+   end;
+
+   procedure Put_Column (Item : String) is
+      use Ada.Text_IO;
+      use Ada.Strings.Fixed;
+   begin
+      Put (Head (Item, 20));
+      Put ("| ");
+   end;
+
+   procedure Put_Line_Title (Item : String) is
+      use Ada.Text_IO;
+      use Ada.Strings.Fixed;
+   begin
+      Put_Line ("=== " & Item & " ===");
+   end;
 
    procedure Put_Stream_Element_Array (Item : Stream_Element_Array; Width : Positive) is
       use Ada.Strings.Fixed;
@@ -34,13 +91,18 @@ package body Home_Pictures.PNG.Puts is
       use Unsigned_8_Text_IO;
       Column_1_Width : constant := 25;
       Column_2_Width : constant := 20;
+      Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
    begin
-      Put (Head("Length ", Column_1_Width));
+      Put_Column ("Length ");
       Put (Item.Length, Column_2_Width);
       New_Line;
-      Put (Head("Kind ", Column_1_Width));
+      Put_Column ("Kind ");
       Put_Stream_Element_Array (Item.Kind, Column_2_Width);
       New_Line;
+
+      if Item.Kind = Chunk_Kind_IDAT then
+         Put_IDAT (Item.Data.all);
+      end if;
    end Put;
 
    procedure Put (Item : PNG_Chunk_Vector) is
@@ -60,47 +122,57 @@ package body Home_Pictures.PNG.Puts is
       use Unsigned_32_Text_IO;
       use Unsigned_16_Text_IO;
       use Unsigned_8_Text_IO;
-      Column_1_Width : constant := 25;
-      Column_2_Width : constant := 20;
+      use PNG_Color_Kind_Text_IO;
+      use PNG_Bit_Depth_Text_IO;
+      use PNG_Pixel_Count_Text_IO;
+      use PNG_Interlace_Text_IO;
+      use PNG_Filter_Text_IO;
+      use PNG_Compression_Text_IO;
    begin
-      Put (Head("Chunk count ", Column_1_Width));
-      Put (Integer (Item.Chunk_Count), Column_2_Width);
+
+      Ada.Integer_Text_IO.Default_Width := 20;
+      Unsigned_32_Text_IO.Default_Width := 20;
+      Unsigned_16_Text_IO.Default_Width := 20;
+      Unsigned_8_Text_IO.Default_Width := 20;
+      PNG_Color_Kind_Text_IO.Default_Width := 20;
+      PNG_Bit_Depth_Text_IO.Default_Width := 20;
+
+      Put_Column ("Chunk count ");
+      Put (Item.Chunk_Count);
       New_Line;
 
-      Put (Head("Width ", Column_1_Width));
-      Put (Item.Chunk_IHDR.Width, Column_2_Width);
+      Put_Column ("Width ");
+      Put (Item.Chunk_Data_IHDR.Width);
       New_Line;
 
-      Put (Head("Height", Column_1_Width));
-      Put (Item.Chunk_IHDR.Height, Column_2_Width);
+      Put_Column ("Height");
+      Put (Item.Chunk_Data_IHDR.Height);
       New_Line;
 
-      Put (Head("Bit_Depth", Column_1_Width));
-      Put (Tail (Item.Chunk_IHDR.Bit_Depth'Img, Column_2_Width));
+      Put_Column ("Bit_Depth");
+      Put (Item.Chunk_Data_IHDR.Bit_Depth);
       New_Line;
 
-      Put (Head("Color_Kind", Column_1_Width));
-      Put (Tail (Item.Chunk_IHDR.Color_Kind'Img, Column_2_Width));
+      Put_Column ("Color_Kind");
+      Put (Item.Chunk_Data_IHDR.Color_Kind);
       New_Line;
 
-      Put (Head("Compression", Column_1_Width));
-      Put (Tail (Item.Chunk_IHDR.Compression'Img, Column_2_Width));
+      Put_Column ("Compression");
+      Put (Item.Chunk_Data_IHDR.Compression);
       New_Line;
 
-      Put (Head("Filter", Column_1_Width));
-      Put (Tail (Item.Chunk_IHDR.Filter'Img, Column_2_Width));
+      Put_Column ("Filter");
+      Put (Item.Chunk_Data_IHDR.Filter);
       New_Line;
 
-      Put (Head("Interlace", Column_1_Width));
-      Put (Tail (Item.Chunk_IHDR.Interlace'Img, Column_2_Width));
+      Put_Column ("Interlace");
+      Put (Item.Chunk_Data_IHDR.Interlace);
       New_Line (3);
 
-      Put (Head("Chunk_IDAT_List", Column_1_Width));
-      New_Line;
+      Put_Line_Title ("Chunk_IDAT_List");
       Put (Item.Chunk_IDAT_List);
 
-      Put (Head("Chunk_Unkown_List", Column_1_Width));
-      New_Line;
+      Put_Line_Title ("Chunk_Unkown_List");
       Put (Item.Chunk_Unkown_List);
 
       New_Line;
@@ -116,40 +188,7 @@ package body Home_Pictures.PNG.Puts is
       end loop;
    end;
 
-   procedure Put_IDAT (Item : Stream_Element_Array) is
-      use Unsigned_8_Text_IO;
-      use Ada.Text_IO;
-      I : Stream_Element_Offset := Item'First - 1;
-      function Read_Byte return LZ77.Byte is
-         R : LZ77.Byte;
-      begin
-         I := I + 1;
-         R := LZ77.Byte (Item (I));
-         return R;
-      end;
 
-      function More_Bytes return Boolean is
-      begin
-         return I < Item'Last;
-      end;
-
-      procedure Write_Literal (Item : LZ77.Byte) is
-      begin
-         Put (Item);
-      end;
-
-      procedure Write_DL_code (distance, length: Integer) is
-      begin
-         Put ("distance" & distance'Img);
-         New_Line;
-         Put ("length" & length'Img);
-      end;
-
-      procedure Encode is new LZ77.Encode (Method => LZ77.LZHuf, Read_byte => Read_Byte, More_Bytes => More_Bytes, Write_Literal => Write_Literal, Write_DL_code => Write_DL_code);
-   begin
-      Encode;
-      null;
-   end Put_IDAT;
 
 
    procedure Put_Image (Item : PNG_Information) is
@@ -160,7 +199,7 @@ package body Home_Pictures.PNG.Puts is
    begin
       for E of Item.Chunk_Unkown_List loop
          if E.Kind = Chunk_Kind_IDAT then
-            Put_Line ("IDAT");
+            Put_Line ("IDAT:");
             Put_Image (E.Data.all);
             New_Line;
             Put_IDAT (E.Data.all);

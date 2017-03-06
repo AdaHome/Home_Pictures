@@ -7,52 +7,56 @@ with Ada.Text_IO; use Ada.Text_IO;
 
 package body Home_Pictures.PNG is
 
-   procedure Put (Item : Stream_Element_Array) is
-      use Ada.Text_IO;
-   begin
-      for E of Item loop
-         Put (Character'Val (E));
-      end loop;
-   end Put;
-
-   function Create_Chunk_Kind (Item : PNG_Chunk_Kind_Name) return PNG_Chunk_Kind is
+   function Create_Chunk_Kind (Item : PNG_Chunk_Kind_String) return PNG_Chunk_Kind is
       R : PNG_Chunk_Kind;
    begin
-      Assert (Item'Length = 4);
       for I in 0 .. 3 loop
          R (R'First + Stream_Element_Offset (I)) := Character'Pos (Item (Item'First + I));
       end loop;
       return R;
    end;
 
-   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Chunk_IHDR) is
+   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Chunk_Data_IHDR) is
       B : Stream_Element_Array (0 .. 12) with Address => Value'Address;
-      use GNAT.CRC32;
    begin
-      Update (Item, B);
+      GNAT.CRC32.Update (Item, B);
    end Update;
 
 
-   function Calc_Checksum (Item : PNG_Chunk) return Unsigned_32 is
-      use GNAT.CRC32;
-      use Ada.Streams;
-      use type Ada.Streams.Stream_Element_Array;
-      --subtype R is Stream_Element_Offset range 0 .. Stream_Element_Offset (Item.Length - 1);
-      --B : Stream_Element_Array (R) with Address => Item.Kind'Address;
-      C : CRC32;
+   procedure Read (Streamer : Stream_Access; Item : out Unsigned_32) is
    begin
-      Initialize (C);
-      Update (C, Item.Kind);
-      if Item.Data /= null then
-         Update (C, Item.Data.all);
-      end if;
-      return Get_Value (C);
+      Unsigned_32'Read (Streamer, Item);
+      Item := Home_Pictures.Swaps.Bswap_32 (Item);
+      -- All integers that require more than one byte must be in network byte order:
+      -- the most significant byte comes first, then the less significant bytes in
+      -- descending order of significance (MSB LSB for two-byte integers, B3 B2 B1 B0 for four-byte integers).
+      -- The highest bit (value 128) of a byte is numbered bit 7; the lowest bit (value 1) is numbered bit 0.
+      -- Values are unsigned unless otherwise noted. Values explicitly noted as signed are represented in two's complement notation.
+   end Read;
+
+
+   procedure Read_Chunk_Begin (Streamer : Stream_Access; Length : out Unsigned_32; Kind : out PNG_Chunk_Kind; Calculated_Checksum : out GNAT.CRC32.CRC32) is
+   begin
+      Read (Streamer, Length);
+      PNG_Chunk_Kind'Read (Streamer, Kind);
+      GNAT.CRC32.Initialize (Calculated_Checksum);
+      GNAT.CRC32.Update (Calculated_Checksum, Kind);
+      -- A 4-byte CRC (Cyclic Redundancy Check) calculated on the preceding bytes in the chunk,
+      -- including the chunk type code and chunk data fields, but not including the length field.
    end;
 
-   -- http://www.libpng.org/pub/png/spec/1.2/PNG-Structure.html#PNG-file-signature
+
+   procedure Read_Chunk_End (Streamer : Stream_Access; Calculated_Checksum : GNAT.CRC32.CRC32) is
+      Checksum : Unsigned_32;
+   begin
+      Read (Streamer, Checksum);
+      Assert (GNAT.CRC32.Get_Value (Calculated_Checksum) = Checksum, "Checksum does not match.");
+   end;
+
+
+
    procedure Read_Signature (Streamer : Stream_Access) is
       type PNG_Signature is array (0 .. 7) of Unsigned_8 with Pack;
-      --This signature indicates that the remainder of the file contains a single PNG image.
       Signature : PNG_Signature;
       -- The first eight bytes of a PNG file always contain the following (decimal) values:
       --     (decimal)              137  80  78  71  13  10  26  10
@@ -68,42 +72,27 @@ package body Home_Pictures.PNG is
 
 
 
-   procedure Read_First_Chunk (Streamer : Stream_Access; Item : in out PNG_Chunk_IHDR) is
+   procedure Read_First_Chunk (Streamer : Stream_Access; Item : in out PNG_Chunk_Data_IHDR) is
       use Home_Pictures.Swaps;
       use GNAT.CRC32;
       Kind : PNG_Chunk_Kind;
       Kind_IHDR : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IHDR");
       Length : Unsigned_32;
-      Checksum : Unsigned_32;
       Calculated_Checksum : CRC32;
    begin
-      Unsigned_32'Read (Streamer, Length);
-      Length := Bswap_32 (Length);
-      -- All integers that require more than one byte must be in network byte order
+      Read_Chunk_Begin (Streamer, Length, Kind, Calculated_Checksum);
+      Assert (Length = 13, "The first chunk length is invalid. First chunk must be 13 bytes long. This chunk length is" & Length'Img & "bytes long.");
+      Assert (Kind = Kind_IHDR, "The first chunk kind is invalid. The chunk kind must be IHDR. This chunk kind is" & Kind (Kind'First)'Img & ".");
+      -- The PNG_Chunk_Data_IHDR must appear first and be 13 bytes.
+      -- These assertion fails if the PNG stream is corrupted.
 
-      Assert (Length = 13, "First chunk is not 13 bytes.");
-
-      PNG_Chunk_Kind'Read (Streamer, Kind);
-      Assert (Kind = Kind_IHDR, "IHDR is not first.");
-      -- IHDR must appear first.
-
-      PNG_Chunk_IHDR'Read (Streamer, Item);
-
-      Unsigned_32'Read (Streamer, Checksum);
-      Checksum := Bswap_32 (Checksum);
-      -- All integers that require more than one byte must be in network byte order
-
-      Initialize (Calculated_Checksum);
-      Update (Calculated_Checksum, Kind);
+      PNG_Chunk_Data_IHDR'Read (Streamer, Item);
       Update (Calculated_Checksum, Item);
-      -- A 4-byte CRC (Cyclic Redundancy Check) calculated on the preceding bytes in the chunk,
-      -- including the chunk type code and chunk data fields, but not including the length field
 
-      Assert (Get_Value (Calculated_Checksum) = Checksum, "Checksum does not match.");
+      Read_Chunk_End (Streamer, Calculated_Checksum);
 
-
-      Item.Width := Bswap_32 (Item.Width);
-      Item.Height := Bswap_32 (Item.Height);
+      Item.Width := PNG_Width (Bswap_32 (Unsigned_32 (Item.Width)));
+      Item.Height := PNG_Height (Bswap_32 (Unsigned_32 (Item.Height)));
       -- All integers that require more than one byte must be in network byte order
 
    end;
@@ -112,13 +101,9 @@ package body Home_Pictures.PNG is
    procedure Read_Chunk (Streamer : Stream_Access; Chunk : in out PNG_Chunk) is
       use Home_Pictures.Swaps;
       use Ada.Streams;
+      Calculated_Checksum : GNAT.CRC32.CRC32;
    begin
-      Unsigned_32'Read (Streamer, Chunk.Length);
-      Chunk.Length := Bswap_32 (Chunk.Length);
-      -- All integers that require more than one byte must be in network byte order
-
-      PNG_Chunk_Kind'Read (Streamer, Chunk.Kind);
-
+      Read_Chunk_Begin (Streamer, Chunk.Length, Chunk.Kind, Calculated_Checksum);
       if Chunk.Length > 0 then
          declare
             subtype R is Stream_Element_Offset range 0 .. Stream_Element_Offset (Chunk.Length - 1);
@@ -126,17 +111,14 @@ package body Home_Pictures.PNG is
          begin
             Chunk.Data := new S;
             S'Read (Streamer, Chunk.Data.all);
+            GNAT.CRC32.Update (Calculated_Checksum, Chunk.Data.all);
          end;
       else
          Chunk.Data := null;
       end if;
       -- Allocate new space for the chunk given chunk length.
 
-      Unsigned_32'Read (Streamer, Chunk.Checksum);
-      Chunk.Checksum := Bswap_32 (Chunk.Checksum);
-      -- All integers that require more than one byte must be in network byte order
-
-      Assert (Calc_Checksum (Chunk) = Chunk.Checksum, "Checksum does not match");
+      Read_Chunk_End (Streamer, Calculated_Checksum);
    end;
 
 
@@ -147,9 +129,8 @@ package body Home_Pictures.PNG is
       Chunk_Kind_IDAT : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IDAT");
    begin
       Read_Signature (Streamer);
-      --The first eight bytes of a PNG file always contain the PNG signature.
 
-      Read_First_Chunk (Streamer, Item.Chunk_IHDR);
+      Read_First_Chunk (Streamer, Item.Chunk_Data_IHDR);
       -- IHDR must appear first.
 
       Item.Chunk_Count := Item.Chunk_Count + 1;
@@ -169,6 +150,8 @@ package body Home_Pictures.PNG is
             Assert (Item.Chunk_Count < 10, "Max chunk count reached, no more chunk can be read. This is just a protection against infinite loop.");
          end loop;
       end;
+
+
    end Read;
 
 
