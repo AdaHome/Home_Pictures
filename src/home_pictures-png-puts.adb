@@ -15,12 +15,12 @@ package body Home_Pictures.PNG.Puts is
    package Unsigned_32_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_32);
    package Unsigned_16_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_16);
    package Unsigned_8_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_8);
-   package PNG_Pixel_Count_Text_IO is new Ada.Text_IO.Modular_IO (PNG_Pixel_Count);
    package PNG_Bit_Depth_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Bit_Depth);
    package PNG_Color_Kind_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Color_Kind);
    package PNG_Interlace_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Interlace);
    package PNG_Filter_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Filter);
    package PNG_Compression_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Compression);
+   package PNG_Chunk_Kind_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Chunk_Kind);
 
 
 
@@ -137,6 +137,7 @@ package body Home_Pictures.PNG.Puts is
       use Unsigned_32_Text_IO;
       use Unsigned_16_Text_IO;
       use Unsigned_8_Text_IO;
+      use PNG_Chunk_Kind_Text_IO;
       Column_1_Width : constant := 25;
       Column_2_Width : constant := 20;
       --Chunk_Kind_IDAT : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("IDAT");
@@ -144,10 +145,7 @@ package body Home_Pictures.PNG.Puts is
       Put_Column ("Length ");
       Put (Item.Length, Column_2_Width);
       New_Line;
-      --Put_Column ("Kind ");
-      --Put_Stream_Element_Array (Item.Kind, Column_2_Width);
-      --New_Line;
-
+      Put (Item.Kind);
 --        if Item.Kind = Chunk_Kind_IDAT then
 --           Put_IDAT (Item.Data.all);
 --        end if;
@@ -172,7 +170,6 @@ package body Home_Pictures.PNG.Puts is
       use Unsigned_8_Text_IO;
       use PNG_Color_Kind_Text_IO;
       use PNG_Bit_Depth_Text_IO;
-      use PNG_Pixel_Count_Text_IO;
       use PNG_Interlace_Text_IO;
       use PNG_Filter_Text_IO;
       use PNG_Compression_Text_IO;
@@ -190,38 +187,38 @@ package body Home_Pictures.PNG.Puts is
       New_Line;
 
       Put_Column ("Width ");
-      Put (Item.Chunk_Data_IHDR.Width);
+      Put (Item.Data_IHDR.Width);
       New_Line;
 
       Put_Column ("Height");
-      Put (Item.Chunk_Data_IHDR.Height);
+      Put (Item.Data_IHDR.Height);
       New_Line;
 
       Put_Column ("Bit_Depth");
-      Put (Item.Chunk_Data_IHDR.Bit_Depth);
+      Put (Item.Data_IHDR.Bit_Depth);
       New_Line;
 
       Put_Column ("Color_Kind");
-      Put (Item.Chunk_Data_IHDR.Color_Kind);
+      Put (Item.Data_IHDR.Color_Kind);
       New_Line;
 
       Put_Column ("Compression");
-      Put (Item.Chunk_Data_IHDR.Compression);
+      Put (Item.Data_IHDR.Compression);
       New_Line;
 
       Put_Column ("Filter");
-      Put (Item.Chunk_Data_IHDR.Filter);
+      Put (Item.Data_IHDR.Filter);
       New_Line;
 
       Put_Column ("Interlace");
-      Put (Item.Chunk_Data_IHDR.Interlace);
+      Put (Item.Data_IHDR.Interlace);
       New_Line (3);
 
       Put_Line_Title ("Chunk_IDAT_List");
-      Put (Item.Chunk_IDAT_List);
+      Put (Item.Data_IDAT_List);
 
       Put_Line_Title ("Chunk_Unkown_List");
-      Put (Item.Chunk_Unkown_List);
+      Put (Item.Data_Unkown_List);
 
       New_Line;
    end;
@@ -236,8 +233,24 @@ package body Home_Pictures.PNG.Puts is
       end loop;
    end;
 
+   procedure Put (Item : PNG_Small_Chunk) is
+      use Ada.Text_IO;
+      use Ada.Integer_Text_IO;
+      use Unsigned_32_Text_IO;
+      use PNG_Chunk_Kind_Text_IO;
+   begin
+      Put (Item.Length);
+      Put ("|");
+      Put (Item.Kind);
+   end Put;
 
-
+   procedure Put_Lines (Item : PNG_Small_Chunk_Vector) is
+   begin
+      for E of Item loop
+         Put (E);
+         New_Line;
+      end loop;
+   end Put_Lines;
 
    procedure Put_Image (Item : PNG_Information) is
       use Ada.Text_IO;

@@ -1,5 +1,3 @@
-with "../Ada-GL/GL";
-
 library project Home_Pictures is
 
   for Languages use ("ada");

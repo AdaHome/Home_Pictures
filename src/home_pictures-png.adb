@@ -2,6 +2,7 @@ with Home_Pictures.Swaps;
 with GNAT.CRC32;
 with Ada.Streams;
 with Ada.Text_IO; use Ada.Text_IO;
+with Ada.Unchecked_Deallocation;
 
 -- http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
 
@@ -14,7 +15,7 @@ package body Home_Pictures.PNG is
       return R;
    end;
 
-   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Chunk_Data_IHDR) is
+   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Data_IHDR) is
       B : Stream_Element_Array (0 .. 12) with Address => Value'Address;
    begin
       GNAT.CRC32.Update (Item, B);
@@ -47,6 +48,9 @@ package body Home_Pictures.PNG is
    begin
       PNG_Chunk_Kind'Read (Streamer, Kind);
       Update (Calculated_Checksum, Kind);
+      -- TODO: Swap kind here?
+      -- libpng is swapping the kind.
+      -- It might not be useful to swap the kind.
    end;
 
 
@@ -61,9 +65,8 @@ package body Home_Pictures.PNG is
 
 
    procedure Read_Chunk_End (Streamer : Stream_Access; Calculated_Checksum : GNAT.CRC32.CRC32) is
-      Checksum : Unsigned_32;
+      Checksum : PNG_Checksum;
    begin
-      --Unsigned_32'Read (Streamer, Checksum);
       Read (Streamer, Checksum);
       Assert (GNAT.CRC32.Get_Value (Calculated_Checksum) = Checksum, "Checksum does not match.");
    end;
@@ -83,8 +86,30 @@ package body Home_Pictures.PNG is
       Assert (Signature = Signature_Constant, "The signature does not match a PNG signature");
    end;
 
+   procedure Swap_Byte_Order (Item : in out PNG_Data_IHDR) is
+      use Home_Pictures.Swaps;
+   begin
+      Item.Width := PNG_Width (Bswap_32 (Unsigned_32 (Item.Width)));
+      Item.Height := PNG_Height (Bswap_32 (Unsigned_32 (Item.Height)));
+      -- All integers that require more than one byte must be in network byte order
+      -- TODO: Do not swap byte order on a network byte order machine.
+   end;
 
-   procedure Read_First_Chunk (Streamer : Stream_Access; Item : in out PNG_Chunk_Data_IHDR) is
+   function Find_Channel_Count (Item : PNG_Color_Kind) return Natural is
+   begin
+      case Item is
+         when PNG_Color_Kind_Greyscale | PNG_Color_Kind_Indexed_Colour =>
+            return 1;
+         when PNG_Color_Kind_Truecolour =>
+            return 3;
+         when PNG_Color_Kind_Greyscale_With_Alpha =>
+            return 2;
+         when PNG_Color_Kind_Truecolour_With_Alpha =>
+            return 4;
+      end case;
+   end;
+
+   procedure Read_First_Chunk (Streamer : Stream_Access; Item : in out PNG_Data_IHDR) is
       use Home_Pictures.Swaps;
       use GNAT.CRC32;
       Kind : PNG_Chunk_Kind;
@@ -93,26 +118,19 @@ package body Home_Pictures.PNG is
       Calculated_Checksum : CRC32;
    begin
       Read_Chunk_Begin (Streamer, Length, Kind, Calculated_Checksum);
-      Put_Line ("Kind'Img " & Kind'Img);
       Assert (Length = 13, "The first chunk length is invalid. First chunk must be 13 bytes long. This chunk length is" & Length'Img & "bytes long.");
       Assert (Kind = PNG_Chunk_Kind_IHDR, "The first chunk kind is invalid. The chunk kind must be IHDR. This chunk kind is" & Kind'Img & ".");
       -- The PNG_Chunk_Data_IHDR must appear first and be 13 bytes.
       -- These assertion fails if the PNG stream is corrupted.
 
-      PNG_Chunk_Data_IHDR'Read (Streamer, Item);
+      PNG_Data_IHDR'Read (Streamer, Item);
       Update (Calculated_Checksum, Item);
-
       Read_Chunk_End (Streamer, Calculated_Checksum);
-
-      Item.Width := PNG_Width (Bswap_32 (Unsigned_32 (Item.Width)));
-      Item.Height := PNG_Height (Bswap_32 (Unsigned_32 (Item.Height)));
-      -- All integers that require more than one byte must be in network byte order
-
+      Swap_Byte_Order (Item);
    end;
 
 
    procedure Read_Chunk (Streamer : Stream_Access; Chunk : in out PNG_Chunk) is
-      use Home_Pictures.Swaps;
       use Ada.Streams;
       Calculated_Checksum : GNAT.CRC32.CRC32;
    begin
@@ -140,10 +158,13 @@ package body Home_Pictures.PNG is
    begin
       Read_Signature (Streamer);
 
-      Read_First_Chunk (Streamer, Item.Chunk_Data_IHDR);
-      -- IHDR must appear first.
-
+      Read_First_Chunk (Streamer, Item.Data_IHDR);
       Item.Chunk_Count := Item.Chunk_Count + 1;
+      -- The IHDR chunk shall be the first chunk in the PNG datastream.
+
+      Item.Channel_Count := Find_Channel_Count (Item.Data_IHDR.Color_Kind);
+      Item.Pixel_Depth := PNG_Bit_Depth'Enum_Rep (Item.Data_IHDR.Bit_Depth) * Item.Channel_Count;
+      Item.Row_Size_Byte := PNG_Bit_Depth'Enum_Rep (Item.Data_IHDR.Bit_Depth) * Natural (Item.Data_IHDR.Width);
 
       declare
          C : PNG_Chunk;
@@ -152,9 +173,9 @@ package body Home_Pictures.PNG is
             Read_Chunk (Streamer, C);
             Item.Chunk_Count := Item.Chunk_Count + 1;
             if C.Kind = PNG_Chunk_Kind_IDAT then
-               Item.Chunk_IDAT_List.Append (C);
+               Item.Data_IDAT_List.Append (C);
             else
-               Item.Chunk_Unkown_List.Append (C);
+               Item.Data_Unkown_List.Append (C);
             end if;
             exit when C.Kind = PNG_Chunk_Kind_IEND;
             Assert (Item.Chunk_Count < 10, "Max chunk count reached, no more chunk can be read. This is just a protection against infinite loop.");
@@ -162,6 +183,46 @@ package body Home_Pictures.PNG is
       end;
    end Read;
 
+   procedure Read_Chunk (Streamer : Stream_Access; Item : out PNG_Small_Chunk) is
+      Calculated_Checksum : GNAT.CRC32.CRC32;
+      type Stream_Element_Array_Access is access all Stream_Element_Array;
+      Data : Stream_Element_Array_Access;
+      procedure Free is new Ada.Unchecked_Deallocation (Stream_Element_Array, Stream_Element_Array_Access);
+   begin
+      Read_Chunk_Begin (Streamer, Item.Length, Item.Kind, Calculated_Checksum);
+      declare
+         subtype R is Stream_Element_Offset range 1 .. Stream_Element_Offset (Item.Length);
+         subtype S is Stream_Element_Array (R);
+      begin
+         Data := new S;
+         S'Read (Streamer, Data.all);
+      end;
+      GNAT.CRC32.Update (Calculated_Checksum, Data.all);
+      Free (Data);
+      Read_Chunk_End (Streamer, Calculated_Checksum);
+   end;
+
+   procedure Read_Complete (Streamer : Stream_Access; Item : out PNG_Small_Chunk_Vector) is
+      N : Natural := 0;
+      E : PNG_Small_Chunk;
+   begin
+      Read_Signature (Streamer);
+      loop
+         Read_Chunk (Streamer, E);
+         Item.Append (E);
+         exit when E.Kind = PNG_Chunk_Kind_IEND;
+         N := N + 1;
+         exit when N > 40; -- Guard.
+      end loop;
+   end;
+
+   procedure Read_Complete (File_Name : String; Item : out PNG_Small_Chunk_Vector) is
+      F : Ada.Streams.Stream_IO.File_Type;
+   begin
+      Open (F, In_File, File_Name);
+      Read_Complete (Stream (F), Item);
+      Close (F);
+   end;
 
 
 end;
