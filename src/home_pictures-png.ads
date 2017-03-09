@@ -233,11 +233,28 @@ package Home_Pictures.PNG is
    -- The CRC polynomial employed is x^32+x^26+x^23+x^22+x^16+x^12+x^11+x^10+x^8+x^7+x^5+x^4+x^2+x+1
 
 
-   type PNG_Color_RGB_8 is array (0 .. 2) of Unsigned_8;
-   type PNG_Color_RGB_8_Map is array (Unsigned_32 range <>, Unsigned_32 range <>) of PNG_Color_RGB_8;
-   type PNG_Color_RGBA_8 is array (0 .. 3) of Unsigned_8;
-   type PNG_Color_RGBA_8_Map is array (Unsigned_32 range <>, Unsigned_32 range <>) of PNG_Color_RGBA_8;
+   type PNG_Filter_Type is
+     (
+      PNG_Filter_Type_None, --Filt(x) = Orig(x)
+      PNG_Filter_Type_Sub,  --Filt(x) = Orig(x) - Orig(a)
+      PNG_Filter_Type_Up,   --Filt(x) = Orig(x) - Orig(b)
+      PNG_Filter_Type_Average, --Filt(x) = Orig(x) - floor((Orig(a) + Orig(b)) / 2)
+      PNG_Filter_Type_Paeth --Filt(x) = Orig(x) - PaethPredictor(Orig(a), Orig(b), Orig(c))
+     );
+   for PNG_Filter_Type'Size use 8;
+   for PNG_Filter_Type use
+     (
+      PNG_Filter_Type_None => 0,
+      PNG_Filter_Type_Sub => 1,
+      PNG_Filter_Type_Up => 2,
+      PNG_Filter_Type_Average => 3,
+      PNG_Filter_Type_Paeth => 4
+     );
 
+
+   subtype PNG_Pixel_Per_Unit is Unsigned_32;
+   subtype PNG_Unit_Specifier is Unsigned_8;
+   subtype PNG_Image_Gamma is Unsigned_32;
 
    type PNG_Rendering_Intent is
      (
@@ -254,6 +271,11 @@ package Home_Pictures.PNG is
       PNG_Rendering_Intent_Saturation            => 2,
       PNG_Rendering_Intent_Absolute_Colorimetric => 3
      );
+
+
+   subtype PNG_Channel8 is Unsigned_8;
+   type PNG_Pixel_RGBA8 is array (0 .. 3) of PNG_Channel8;
+   type PNG_Pixel_RGBA8_Row is array (Integer range <>) of PNG_Channel8;
 
 
    type PNG_Chunk is record
@@ -285,6 +307,18 @@ package Home_Pictures.PNG is
 
    type PNG_Data_sRGB is record
       Rendering_Intent : PNG_Rendering_Intent;
+   end record;
+
+
+   type PNG_Data_pHYs is record
+      Pixel_Per_Unit_X : PNG_Pixel_Per_Unit;
+      Pixel_Per_Unit_Y : PNG_Pixel_Per_Unit;
+      Unit_Specifier : PNG_Unit_Specifier;
+   end record;
+
+
+   type PNG_Data_gAMA is record
+      Image_Gamma : PNG_Image_Gamma;
    end record;
 
 
@@ -383,8 +417,7 @@ package Home_Pictures.PNG is
 
 
    procedure Read_Chunk (Streamer : Stream_Access; Item : out PNG_Small_Chunk);
-   -- Read small chunk.
-   -- No space is allocated.
+   -- No space for data is allocated.
    -- Raises exception on PNG datastream corruption.
 
 

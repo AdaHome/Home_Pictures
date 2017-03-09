@@ -5,11 +5,6 @@ with Ada.Streams.Stream_IO;
 with Ada.Containers.Vectors;
 with Interfaces;
 
-with Zip;
-with Zip_Streams;
-
-with Home_Streams.Memory_Overlays;
-
 package body Home_Pictures.PNG.Puts is
 
    package Unsigned_32_Text_IO is new Ada.Text_IO.Modular_IO (Unsigned_32);
@@ -90,18 +85,21 @@ package body Home_Pictures.PNG.Puts is
       end loop;
    end Put;
 
-   procedure Put_IDAT (Item : Stream_Element_Array) is
-      -- I'm trying to inflate uncompress IDAT data here.
-      -- Then print out the uncompressed data.
-      -- If the values look right I will add code to render the uncompressed data as OpenGL texture.
-      --use Home_Streams.Memory_Overlays;
-      --O : Overlay_Memory_Stream := Create (Item'Address, Item'Length);
-      --Z : Zip.Zip_info;
+   procedure Put_Hex (Item : Stream_Element_Array) is
+      use Ada.Integer_Text_IO;
    begin
+      for E of Item loop
+         Put (Standard_Output, Integer (E), 8, 16);
+      end loop;
+   end;
 
-      --Zip.Load (Z, Zip_Streams.Root_Zipstream_Type (Stream (O).all));
-      --Put_Line ("Is_loaded " & Zip.Is_loaded (Z)'Img);
-      null;
+
+
+   procedure Put_IDAT (Item : Stream_Element_Array) is
+   begin
+      New_Line;
+      Put_Hex (Item);
+      New_Line;
    end;
 
    procedure Put_Column (Item : String) is
@@ -146,9 +144,9 @@ package body Home_Pictures.PNG.Puts is
       Put (Item.Length, Column_2_Width);
       New_Line;
       Put (Item.Kind);
---        if Item.Kind = Chunk_Kind_IDAT then
---           Put_IDAT (Item.Data.all);
---        end if;
+      if Item.Kind = PNG_Chunk_Kind_IDAT then
+         Put_IDAT (Item.Data.all);
+      end if;
    end Put;
 
    procedure Put (Item : PNG_Chunk_Vector) is
@@ -251,31 +249,5 @@ package body Home_Pictures.PNG.Puts is
          New_Line;
       end loop;
    end Put_Lines;
-
-   procedure Put_Image (Item : PNG_Information) is
-      use Ada.Text_IO;
---        Chunk_Kind_IDAT : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("IDAT");
---        Chunk_Kind_gAMA : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("gAMA");
---        Chunk_Kind_pHYs : constant PNG_Chunk_Kind_Sequence := Create_Chunk_Kind ("pHYs");
-   begin
---        for E of Item.Chunk_Unkown_List loop
---           if E.Kind = Chunk_Kind_IDAT then
---              Put_Line ("IDAT:");
---              Put_Image (E.Data.all);
---              New_Line;
---              Put_IDAT (E.Data.all);
---              New_Line;
---           elsif E.Kind = Chunk_Kind_gAMA then
---              Put_Line ("gAMA");
---              Put_Image (E.Data.all);
---              New_Line;
---           elsif E.Kind = Chunk_Kind_pHYs then
---              Put_Line ("pHYs");
---              Put_Image (E.Data.all);
---              New_Line;
---           end if;
---        end loop;
-      null;
-   end;
 
 end;
