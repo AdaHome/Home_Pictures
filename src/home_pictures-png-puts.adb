@@ -4,6 +4,7 @@ with Ada.Integer_Text_IO;
 with Ada.Streams.Stream_IO;
 with Ada.Containers.Vectors;
 with Interfaces;
+with ztest;
 
 package body Home_Pictures.PNG.Puts is
 
@@ -13,7 +14,7 @@ package body Home_Pictures.PNG.Puts is
    package PNG_Bit_Depth_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Bit_Depth);
    package PNG_Color_Kind_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Color_Kind);
    package PNG_Interlace_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Interlace);
-   package PNG_Filter_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Filter);
+   package PNG_Filter_Method_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Filter_Method);
    package PNG_Compression_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Compression);
    package PNG_Chunk_Kind_Text_IO is new Ada.Text_IO.Enumeration_IO (PNG_Chunk_Kind);
 
@@ -96,9 +97,23 @@ package body Home_Pictures.PNG.Puts is
 
 
    procedure Put_IDAT (Item : Stream_Element_Array) is
+      use ztest;
+      Z : Z_Native_Stream;
+      S : Z_Status;
+      O : Stream_Element_Array (1 .. 1000);
    begin
+      Initialize_Inflate (Z, 15);
+      Set_Next_Input (Z, Item);
+      Set_Next_Output (Z, O);
+      S := Inflate (Z, Z_Flush_None);
+      Put_Line (S'Img);
+
       New_Line;
       Put_Hex (Item);
+      New_Line;
+
+      New_Line;
+      Put_Hex (O (1 .. Stream_Element_Offset (Z.Output_Total)));
       New_Line;
    end;
 
@@ -169,7 +184,7 @@ package body Home_Pictures.PNG.Puts is
       use PNG_Color_Kind_Text_IO;
       use PNG_Bit_Depth_Text_IO;
       use PNG_Interlace_Text_IO;
-      use PNG_Filter_Text_IO;
+      use PNG_Filter_Method_Text_IO;
       use PNG_Compression_Text_IO;
    begin
 
@@ -205,7 +220,7 @@ package body Home_Pictures.PNG.Puts is
       New_Line;
 
       Put_Column ("Filter");
-      Put (Item.Data_IHDR.Filter);
+      Put (Item.Data_IHDR.Filter_Method);
       New_Line;
 
       Put_Column ("Interlace");

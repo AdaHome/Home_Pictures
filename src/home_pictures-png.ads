@@ -145,6 +145,18 @@ package Home_Pictures.PNG is
    -- PNG_Indexed_Colour        = 3 | 1, 2, 4, 8          | Each pixel is a palette index; a PLTE chunk must appear.
    -- PNG_Greyscale_With_Alpha  = 4 | 8,          16      | Each pixel is a grayscale sample, followed by an alpha sample.
    -- PNG_Truecolour_With_Alpha = 6 | 8,          16      | Each pixel is an R,G,B triple,followed by an alpha sample.
+   -- Truecolour with alpha: each pixel consists of four samples: red, green, blue, and alpha.
+   -- Greyscale with alpha: each pixel consists of two samples: grey and alpha.
+   -- Truecolour: each pixel consists of three samples: red, green, and blue.
+   -- The alpha channel may be represented by a single pixel value.
+   -- Matching pixels are fully transparent, and all others are fully opaque.
+   -- If the alpha channel is not represented in this way, all pixels are fully opaque.
+   -- Greyscale: each pixel consists of a single sample: grey.
+   -- The alpha channel may be represented by a single pixel value as in the previous case.
+   -- If the alpha channel is not represented in this way, all pixels are fully opaque.
+   -- Indexed-colour: each pixel consists of an index into a palette (and into an associated table of alpha values, if present).
+
+
 
 
    type PNG_Bit_Depth is (PNG_Bit_Depth_1, PNG_Bit_Depth_2, PNG_Bit_Depth_4, PNG_Bit_Depth_8, PNG_Bit_Depth_16);
@@ -193,9 +205,9 @@ package Home_Pictures.PNG is
    -- Two values are currently defined: 0 (no interlace) or 1 (Adam7 interlace). See Interlaced data order for details.
 
 
-   type PNG_Filter is (PNG_Filter_Method_0);
-   for PNG_Filter'Size use 8;
-   for PNG_Filter use
+   type PNG_Filter_Method is (PNG_Filter_Method_0);
+   for PNG_Filter_Method'Size use 8;
+   for PNG_Filter_Method use
      (
       PNG_Filter_Method_0 => 0
      );
@@ -275,7 +287,9 @@ package Home_Pictures.PNG is
 
    subtype PNG_Channel8 is Unsigned_8;
    type PNG_Pixel_RGBA8 is array (0 .. 3) of PNG_Channel8;
-   type PNG_Pixel_RGBA8_Row is array (Integer range <>) of PNG_Channel8;
+   type PNG_Pixel_RGBA8_Row is array (Integer range <>) of PNG_Pixel_RGBA8;
+
+
 
 
    type PNG_Chunk is record
@@ -300,7 +314,7 @@ package Home_Pictures.PNG is
       Bit_Depth         : PNG_Bit_Depth;
       Color_Kind        : PNG_Color_Kind;
       Compression       : PNG_Compression;
-      Filter            : PNG_Filter;
+      Filter_Method     : PNG_Filter_Method;
       Interlace         : PNG_Interlace;
    end record;
 
@@ -334,13 +348,13 @@ package Home_Pictures.PNG is
       Chunk_Count : Natural := 0;
       -- TODO: Is chunk count necessary?
 
-      Channel_Count : Natural;
-      Pixel_Depth : Natural;
-      Row_Size_Byte : Natural;
+      Channel_Count : Unsigned_8;
+      Pixel_Depth_Bit : Unsigned_8;
+      Pixel_Depth_Byte : Unsigned_8;
+      Row_Size_Byte : Unsigned_32;
 
       Data_IHDR : PNG_Data_IHDR;
-      -- IHDR must appear first and IEND must appear last;
-      -- thus the IEND chunk serves as an end-of-file marker
+      -- Critical chunk. Contains critical information about the PNG.
 
       Data_sRGB : PNG_Data_sRGB;
       -- IHDR must appear first and IEND must appear last;
@@ -366,8 +380,6 @@ package Home_Pictures.PNG is
    end record;
    -- All implementations must understand and successfully render the standard critical chunks.
    -- A valid PNG image must contain an IHDR chunk, one or more IDAT chunks, and an IEND chunk.
-
-
 
 
 
@@ -433,7 +445,7 @@ package Home_Pictures.PNG is
    -- Raises exception on PNG datastream corruption.
 
 
-   function Find_Channel_Count (Item : PNG_Color_Kind) return Natural;
+   function Find_Channel_Count (Item : PNG_Color_Kind) return Unsigned_8;
 
 
    procedure Swap_Byte_Order (Item : in out PNG_Data_IHDR);

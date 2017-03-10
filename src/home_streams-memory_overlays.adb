@@ -1,5 +1,6 @@
 with Ada.Assertions;
 with System.Storage_Elements;
+--with System.Address_To_Access_Conversions;
 
 package body Home_Streams.Memory_Overlays is
 
@@ -14,8 +15,10 @@ package body Home_Streams.Memory_Overlays is
    end Reset;
 
    function Stream (Object : Overlay_Memory_Stream) return not null access Ada.Streams.Root_Stream_Type'Class is
+      --package P is new System.Address_To_Access_Conversions (Overlay_Memory_Stream);
    begin
       return Object'Unrestricted_Access;
+      --return P.To_Pointer (Object'Address);
    end Stream;
 
    overriding procedure Read (Object : in out Overlay_Memory_Stream; Item : out Ada.Streams.Stream_Element_Array; Last : out Ada.Streams.Stream_Element_Offset) is

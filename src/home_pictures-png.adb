@@ -95,7 +95,7 @@ package body Home_Pictures.PNG is
       -- TODO: Do not swap byte order on a network byte order machine.
    end;
 
-   function Find_Channel_Count (Item : PNG_Color_Kind) return Natural is
+   function Find_Channel_Count (Item : PNG_Color_Kind) return Unsigned_8 is
    begin
       case Item is
          when PNG_Color_Kind_Greyscale | PNG_Color_Kind_Indexed_Colour =>
@@ -163,8 +163,9 @@ package body Home_Pictures.PNG is
       -- The IHDR chunk shall be the first chunk in the PNG datastream.
 
       Item.Channel_Count := Find_Channel_Count (Item.Data_IHDR.Color_Kind);
-      Item.Pixel_Depth := PNG_Bit_Depth'Enum_Rep (Item.Data_IHDR.Bit_Depth) * Item.Channel_Count;
-      Item.Row_Size_Byte := PNG_Bit_Depth'Enum_Rep (Item.Data_IHDR.Bit_Depth) * Natural (Item.Data_IHDR.Width);
+      Item.Pixel_Depth_Bit := PNG_Bit_Depth'Enum_Rep (Item.Data_IHDR.Bit_Depth) * Item.Channel_Count;
+      Item.Pixel_Depth_Byte := Shift_Right (Item.Pixel_Depth_Bit + 7, 3);
+      Item.Row_Size_Byte := Unsigned_32 (Item.Pixel_Depth_Byte) * Item.Data_IHDR.Width;
 
       declare
          C : PNG_Chunk;
@@ -224,5 +225,49 @@ package body Home_Pictures.PNG is
       Close (F);
    end;
 
+   function Reconstruction_Function (Filter_Type : PNG_Filter_Type; X, A, B, C : Unsigned_8) return Unsigned_8 is
+   begin
+      case Filter_Type is
+      when PNG_Filter_Type_None =>
+         return X;
+      when PNG_Filter_Type_Sub =>
+         return X + B;
+      when PNG_Filter_Type_Up =>
+         return X + A;
+      when PNG_Filter_Type_Average =>
+         return X + ((A + B) / 2);
+      when PNG_Filter_Type_Paeth =>
+         declare
+            P, PA, PB, PC, PR : Unsigned_8;
+         begin
+            P := A + B - C;
+            PA := abs (P - A);
+            PB := abs (P - B);
+            PC := abs (P - C);
+            if PA <= PB and PA <= PC then
+               PR := A;
+            elsif PB <= PC then
+               PR := B;
+            else
+               PR := C;
+            end if;
+            return PR;
+         end;
+      end case;
+   end;
+
+   procedure Reconstruction_Procedure (Filter_Type : PNG_Filter_Type; Pixel_Depth_Byte : Stream_Element_Offset; Previous : in Stream_Element_Array; Current : in out Stream_Element_Array) is
+   begin
+      for I in Current'First + 1 .. Current'Last loop
+         declare
+            X : constant Unsigned_8 := Unsigned_8 (Current (I));
+            A : constant Unsigned_8 := Unsigned_8 (Current (I - Pixel_Depth_Byte));
+            B : constant Unsigned_8 := Unsigned_8 (Previous (I));
+            C : constant Unsigned_8 := Unsigned_8 (Previous (I - Pixel_Depth_Byte));
+         begin
+            Current (I) := Stream_Element (Reconstruction_Function (Filter_Type, X, A, B, C));
+         end;
+      end loop;
+   end;
 
 end;
