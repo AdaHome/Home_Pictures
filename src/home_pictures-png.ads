@@ -13,6 +13,7 @@ with GNAT.CRC32;
 
 with Home_Pictures.Swaps;
 
+with ztest;
 
 package Home_Pictures.PNG is
 
@@ -284,8 +285,15 @@ package Home_Pictures.PNG is
       PNG_Rendering_Intent_Absolute_Colorimetric => 3
      );
 
+   function Find_Channel_Count (Item : PNG_Color_Kind) return Unsigned_8;
+
+   type PNG_Format is (PNG_Format_RGBA4, PNG_Format_RGBA8);
 
    subtype PNG_Channel8 is Unsigned_8;
+   subtype PNG_Channel16 is Unsigned_16;
+   type PNG_Pixel8 is array (Integer range <>) of PNG_Channel8;
+   type PNG_Pixel16 is array (Integer range <>) of PNG_Channel16;
+
    type PNG_Pixel_RGBA8 is array (0 .. 3) of PNG_Channel8;
    type PNG_Pixel_RGBA8_Row is array (Integer range <>) of PNG_Pixel_RGBA8;
 
@@ -334,6 +342,9 @@ package Home_Pictures.PNG is
    type PNG_Data_gAMA is record
       Image_Gamma : PNG_Image_Gamma;
    end record;
+
+
+
 
 
    package PNG_Small_Chunk_Vectors is new Ada.Containers.Vectors (Positive, PNG_Small_Chunk);
@@ -445,11 +456,15 @@ package Home_Pictures.PNG is
    -- Raises exception on PNG datastream corruption.
 
 
-   function Find_Channel_Count (Item : PNG_Color_Kind) return Unsigned_8;
-
-
    procedure Swap_Byte_Order (Item : in out PNG_Data_IHDR);
 
+
+   procedure Inflate_All
+     (Z : in out ztest.Z_Native_Stream;
+      Width : PNG_Width;
+      Height : PNG_Height;
+      Pixel_Depth_Byte : Stream_Element_Offset;
+      Data : in out Stream_Element_Array);
 
 private
 
