@@ -3,10 +3,11 @@ with Interfaces;
 with System;
 with System.Storage_Elements;
 
+with Ada.Streams;
 with Ada.Streams.Stream_IO;
+
 with Ada.Assertions;
 with Ada.Unchecked_Conversion;
-with Ada.Streams;
 with Ada.Containers.Vectors;
 
 with GNAT.CRC32;
@@ -285,20 +286,6 @@ package Home_Pictures.PNG is
       PNG_Rendering_Intent_Absolute_Colorimetric => 3
      );
 
-   function Find_Channel_Count (Item : PNG_Color_Kind) return Unsigned_8;
-
-   type PNG_Format is (PNG_Format_RGBA4, PNG_Format_RGBA8);
-
-   subtype PNG_Channel8 is Unsigned_8;
-   subtype PNG_Channel16 is Unsigned_16;
-   type PNG_Pixel8 is array (Integer range <>) of PNG_Channel8;
-   type PNG_Pixel16 is array (Integer range <>) of PNG_Channel16;
-
-   type PNG_Pixel_RGBA8 is array (0 .. 3) of PNG_Channel8;
-   type PNG_Pixel_RGBA8_Row is array (Integer range <>) of PNG_Pixel_RGBA8;
-
-
-
 
    type PNG_Chunk is record
       Length : PNG_Chunk_Size_Byte;
@@ -363,6 +350,7 @@ package Home_Pictures.PNG is
       Pixel_Depth_Bit : Unsigned_8;
       Pixel_Depth_Byte : Unsigned_8;
       Row_Size_Byte : Unsigned_32;
+      Complete_Size_Byte : Unsigned_32;
 
       Data_IHDR : PNG_Data_IHDR;
       -- Critical chunk. Contains critical information about the PNG.
@@ -391,7 +379,6 @@ package Home_Pictures.PNG is
    end record;
    -- All implementations must understand and successfully render the standard critical chunks.
    -- A valid PNG image must contain an IHDR chunk, one or more IDAT chunks, and an IEND chunk.
-
 
 
    function Create_Chunk_Kind_32 (Item : PNG_Chunk_Kind_String) return Unsigned_32;
@@ -433,7 +420,13 @@ package Home_Pictures.PNG is
    -- Raises exception on PNG datastream corruption.
 
 
-   procedure Read_Chunk (Streamer : Stream_Access; Chunk : in out PNG_Chunk);
+   procedure Read_Chunk (Streamer : Stream_Access; Kind : out PNG_Chunk_Kind; Data : out Stream_Element_Array; Last : out Stream_Element_Offset);
+   -- Read arbitrary chunk.
+   -- Memory space for chunk data is required.
+   -- Raises exception on PNG datastream corruption.
+
+
+   procedure Read_Chunk_Allocate (Streamer : Stream_Access; Chunk : in out PNG_Chunk);
    -- Read arbitrary chunk.
    -- New space is allocated for the chunk data.
    -- Raises exception on PNG datastream corruption.
@@ -457,6 +450,8 @@ package Home_Pictures.PNG is
 
 
    procedure Swap_Byte_Order (Item : in out PNG_Data_IHDR);
+   -- Swap byte order for integer larger than 8 bit.
+   -- This need to be replaced to a cross compatable.
 
 
    procedure Inflate_All
@@ -464,7 +459,12 @@ package Home_Pictures.PNG is
       Width : PNG_Width;
       Height : PNG_Height;
       Pixel_Depth_Byte : Stream_Element_Offset;
-      Data : in out Stream_Element_Array);
+      Pixmap : out Stream_Element_Array);
+
+
+   procedure Inflate_All (Information : PNG_Information; IDAT : Stream_Element_Array; Pixmap : out Stream_Element_Array);
+   -- Creates a zstream and uncompresses the IDAT to pixmap.
+   -- No data is allocated.
 
 private
 

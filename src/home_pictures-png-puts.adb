@@ -225,6 +225,28 @@ package body Home_Pictures.PNG.Puts is
 
       Put_Column ("Interlace");
       Put (Item.Data_IHDR.Interlace);
+      New_Line;
+
+      Put_Column ("Pixel_Depth_Bit");
+      Put (Item.Pixel_Depth_Bit);
+      New_Line;
+
+      Put_Column ("Pixel_Depth_Byte");
+      Put (Item.Pixel_Depth_Byte);
+      New_Line;
+
+      Put_Column ("Channel_Count");
+      Put (Item.Channel_Count);
+      New_Line;
+
+      Put_Column ("Row_Size_Byte");
+      Put (Item.Row_Size_Byte);
+      New_Line;
+
+      Put_Column ("Complete_Size_Byte");
+      Put (Item.Complete_Size_Byte);
+      New_Line;
+
       New_Line (3);
 
       Put_Line_Title ("Chunk_IDAT_List");

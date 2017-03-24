@@ -130,7 +130,7 @@ package body Home_Pictures.PNG is
    end;
 
 
-   procedure Read_Chunk (Streamer : Stream_Access; Chunk : in out PNG_Chunk) is
+   procedure Read_Chunk_Allocate (Streamer : Stream_Access; Chunk : in out PNG_Chunk) is
       use Ada.Streams;
       Calculated_Checksum : GNAT.CRC32.CRC32;
    begin
@@ -153,6 +153,23 @@ package body Home_Pictures.PNG is
    end;
 
 
+   procedure Read_Chunk (Streamer : Stream_Access; Kind : out PNG_Chunk_Kind; Data : out Stream_Element_Array; Last : out Stream_Element_Offset) is
+      use Ada.Streams;
+      Calculated_Checksum : GNAT.CRC32.CRC32;
+   begin
+      Read_Chunk_Begin (Streamer, Unsigned_32 (Last), Kind, Calculated_Checksum);
+      declare
+         subtype R is Stream_Element_Offset range Data'First .. Data'First + Stream_Element_Offset (Last - 1);
+         subtype S is Stream_Element_Array (R);
+      begin
+         Last := R'Last;
+         S'Read (Streamer, Data (R));
+         GNAT.CRC32.Update (Calculated_Checksum, Data (R));
+      end;
+      Read_Chunk_End (Streamer, Calculated_Checksum);
+   end;
+
+
    procedure Read (Streamer : Stream_Access; Item : in out PNG_Information) is
       use type Ada.Containers.Count_Type;
    begin
@@ -160,18 +177,22 @@ package body Home_Pictures.PNG is
 
       Read_First_Chunk (Streamer, Item.Data_IHDR);
       Item.Chunk_Count := Item.Chunk_Count + 1;
-      -- The IHDR chunk shall be the first chunk in the PNG datastream.
+      -- The IHDR chunk should be the first chunk in the PNG datastream.
 
       Item.Channel_Count := Find_Channel_Count (Item.Data_IHDR.Color_Kind);
       Item.Pixel_Depth_Bit := PNG_Bit_Depth'Enum_Rep (Item.Data_IHDR.Bit_Depth) * Item.Channel_Count;
       Item.Pixel_Depth_Byte := Shift_Right (Item.Pixel_Depth_Bit + 7, 3);
+      --???
+
       Item.Row_Size_Byte := Unsigned_32 (Item.Pixel_Depth_Byte) * Item.Data_IHDR.Width;
+
+      Item.Complete_Size_Byte := Item.Data_IHDR.Width * Item.Data_IHDR.Height * Unsigned_32 (Item.Pixel_Depth_Byte);
 
       declare
          C : PNG_Chunk;
       begin
          loop
-            Read_Chunk (Streamer, C);
+            Read_Chunk_Allocate (Streamer, C);
             Item.Chunk_Count := Item.Chunk_Count + 1;
             if C.Kind = PNG_Chunk_Kind_IDAT then
                Item.Data_IDAT_List.Append (C);
@@ -279,14 +300,12 @@ package body Home_Pictures.PNG is
    end;
 
 
-
-
    procedure Inflate_All
      (Z : in out ztest.Z_Native_Stream;
       Width : PNG_Width;
       Height : PNG_Height;
       Pixel_Depth_Byte : Stream_Element_Offset;
-      Data : in out Stream_Element_Array)
+      Pixmap : out Stream_Element_Array)
    is
       use Ada.Assertions;
       use type Interfaces.C.unsigned;
@@ -333,9 +352,11 @@ package body Home_Pictures.PNG is
 
       Zero_Row : constant Variant_Row := (others => (others => 0));
       Filter : PNG_Filter_Type;
-      Row_Array : Variant_Row_Array with Address => Data'Address;
+      Row_Array : Variant_Row_Array with Address => Pixmap'Address;
 
    begin
+      Assert (Row_Array'Size = Pixmap'Size);
+
       Inflate_Filter_Type (Filter);
       Inflate_Row (Row_Array (1));
       Reconstruct_Row (Filter, Zero_Row, Row_Array (1));
@@ -349,6 +370,17 @@ package body Home_Pictures.PNG is
       Inflate_Filter_Type (Filter);
       Inflate_Last_Row (Row_Array (Row_Array'Last));
       Reconstruct_Row (Filter, Row_Array (Row_Array'Last - 1), Row_Array (Row_Array'Last));
+   end;
+
+
+   procedure Inflate_All (Information : PNG_Information; IDAT : Stream_Element_Array; Pixmap : out Stream_Element_Array) is
+      use ztest;
+      Z : Z_Native_Stream;
+   begin
+      Initialize_Inflate (Z, 15);
+      Set_Next_Input (Z, IDAT);
+      Assert (Pixmap'Length = Information.Complete_Size_Byte);
+      Inflate_All (Z, Information.Data_IHDR.Width, Information.Data_IHDR.Height, Stream_Element_Offset (Information.Pixel_Depth_Byte), Pixmap);
    end;
 
 end;
