@@ -2,11 +2,18 @@ with "../home_zlib/home_zlib";
 
 library project Home_Pictures is
 
-  for Languages use ("ada");
-  for Library_Name use "home_pictures.ada";
-  for Source_Dirs use ("src");
-  for Object_Dir use "obj";
-  for Library_Dir use "lib";
-  for Library_Kind use "static";
+   for Languages use ("ada");
+   for Library_Name use "home_pictures.ada";
+   for Source_Dirs use ("src");
+   for Object_Dir use "obj";
+   for Library_Dir use "lib";
+   for Library_Kind use "static";
  
+   
+   package Builder is
+      --Creating missing directories does not work
+      for Default_Switches ("ada") use ("-p");
+   end Builder;
+   
+   
 end Home_Pictures;
