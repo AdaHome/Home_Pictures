@@ -36,14 +36,17 @@ package body Home_Pictures.PNG.Decode1 is
 
    procedure Reconstruction_Procedure (Filter_Type : PNG_Filter_Type; Pixel_Depth_Byte : Stream_Element_Offset; Previous : in Stream_Element_Array; Current : in out Stream_Element_Array) is
    begin
-      declare
-         X : constant Stream_Element := Current (Current'First);
-         A : constant Stream_Element := 0;
-         B : constant Stream_Element := Previous (Current'First);
-         C : constant Stream_Element := 0;
-      begin
-         Current (Current'First) := Reconstruction_Function (Filter_Type, X, A, B, C);
-      end;
+      for I in Current'First .. Current'First + Pixel_Depth_Byte loop
+         declare
+            X : constant Stream_Element := Current (I);
+            A : constant Stream_Element := 0;
+            B : constant Stream_Element := Previous (I);
+            C : constant Stream_Element := 0;
+         begin
+            Current (I) := Reconstruction_Function (Filter_Type, X, A, B, C);
+         end;
+      end loop;
+
       for I in Current'First + Pixel_Depth_Byte .. Current'Last loop
          declare
             X : constant Stream_Element := Current (I);
