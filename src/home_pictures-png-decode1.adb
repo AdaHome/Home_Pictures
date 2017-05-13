@@ -3,7 +3,44 @@ with Ada.Text_IO;
 
 package body Home_Pictures.PNG.Decode1 is
 
-   function Reconstruction_Function (Filter_Type : PNG_Filter_Type; X, A, B, C : Stream_Element) return Stream_Element is
+
+   procedure Put_Base (Value : PNG_Byte; Width : Natural; Base : Positive) is
+      Hex : constant array (PNG_Byte range 0 .. 15) of Character := "0123456789ABCDEF";
+      B : PNG_Byte := Value;
+      Buffer : String (1 .. Width) := (others => '0');
+   begin
+      for E of reverse Buffer loop
+         E := Hex (B mod PNG_Byte (Base));
+         B := B / PNG_Byte (Base);
+         exit when B = 0;
+      end loop;
+      Ada.Text_IO.Put (Buffer);
+      null;
+   end;
+
+
+   procedure Put_Base_Array (Item : Ada.Streams.Stream_Element_Array; Width : Natural; Base : Positive; Column : Positive) is
+      use type Ada.Streams.Stream_Element_Offset;
+   begin
+      for I in Item'Range loop
+         Ada.Text_IO.Put (" ");
+         Put_Base (PNG_Byte (Item (I)), Width, Base);
+         if Natural (I - Item'First + 1) mod Column = 0 then
+            Ada.Text_IO.New_Line;
+         end if;
+      end loop;
+   end;
+
+
+   procedure Initialize (Z : in out ztest.Z_Native_Stream; IDAT : Stream_Element_Array) is
+      use ztest;
+   begin
+      Initialize_Inflate (Z, 15);
+      Set_Next_Input (Z, IDAT);
+   end;
+
+
+   function Run_Filter_Method_Zero (Filter_Type : PNG_Filter_Type; X, A, B, C : PNG_Byte) return PNG_Byte is
    begin
       case Filter_Type is
       when PNG_Filter_Type_None =>
@@ -16,7 +53,7 @@ package body Home_Pictures.PNG.Decode1 is
          return X + ((A + B) / 2);
       when PNG_Filter_Type_Paeth =>
          declare
-            P, PA, PB, PC, PR : Stream_Element;
+            P, PA, PB, PC, PR : PNG_Byte;
          begin
             P := A + B - C;
             PA := abs (P - A);
@@ -34,115 +71,61 @@ package body Home_Pictures.PNG.Decode1 is
       end case;
    end;
 
-   procedure Reconstruction_Procedure (Filter_Type : PNG_Filter_Type; Pixel_Depth_Byte : Stream_Element_Offset; Previous : in Stream_Element_Array; Current : in out Stream_Element_Array) is
+
+   procedure Run_Filter_Method_Zero (Filter : PNG_Filter_Type; Pixel_Depth : PNG_Pixel_Byte_Depth; Previous : in PNG_Byte_Array; Current : in out PNG_Byte_Array) is
    begin
-      for I in Current'First .. Current'First + Pixel_Depth_Byte loop
+      for I in Current'First .. Current'First + Pixel_Depth loop
          declare
-            X : constant Stream_Element := Current (I);
-            A : constant Stream_Element := 0;
-            B : constant Stream_Element := Previous (I);
-            C : constant Stream_Element := 0;
+            X : constant PNG_Byte := Current (I);
+            A : constant PNG_Byte := 0;
+            B : constant PNG_Byte := Previous (I);
+            C : constant PNG_Byte := 0;
          begin
-            Current (I) := Reconstruction_Function (Filter_Type, X, A, B, C);
+            Current (I) := Run_Filter_Method_Zero (Filter, X, A, B, C);
          end;
       end loop;
-
-      for I in Current'First + Pixel_Depth_Byte .. Current'Last loop
+      for I in Current'First + Pixel_Depth .. Current'Last loop
          declare
-            X : constant Stream_Element := Current (I);
-            A : constant Stream_Element := Current (I - Pixel_Depth_Byte);
-            B : constant Stream_Element := Previous (I);
-            C : constant Stream_Element := Previous (I - Pixel_Depth_Byte);
+            X : constant PNG_Byte := Current (I);
+            A : constant PNG_Byte := Current (I - Pixel_Depth);
+            B : constant PNG_Byte := Previous (I);
+            C : constant PNG_Byte := Previous (I - Pixel_Depth);
          begin
-            Current (I) := Reconstruction_Function (Filter_Type, X, A, B, C);
+            Current (I) := Run_Filter_Method_Zero (Filter, X, A, B, C);
          end;
       end loop;
    end;
 
 
-   procedure Inflate_All
-     (Z : in out ztest.Z_Native_Stream;
-      Width : PNG_Width;
-      Height : PNG_Height;
-      Pixel_Depth_Byte : PNG_Pixel_Byte_Depth;
-      Pixmap : out Stream_Element_Array)
-   is
-      use Ada.Assertions;
-      use type Interfaces.C.unsigned;
-      type Variant_Pixel is array (1 .. Pixel_Depth_Byte) of Stream_Element;
-      type Variant_Row is array (1 .. Width) of Variant_Pixel;
-      type Variant_Row_Array is array (1 .. Height) of Variant_Row;
+   generic
+      type Index is (<>);
+      type Pixel is private;
+      type Row is array (Index) of Pixel;
+   procedure Generic_Reconstruct (Filter : PNG_Filter_Type; Previous : in Row; Next : in out Row);
 
-      procedure Inflate_Filter_Type (Filter_Type : out PNG_Filter_Type) is
-         use ztest;
-         Status : Z_Status;
-      begin
-         Z.Output_Next := Filter_Type'Address;
-         Z.Output_Available := 1;
-         Status := Inflate (Z, Z_Flush_None);
-         Assert (Status = Z_Status_Ok, Status'Img);
-      end;
-
-      procedure Inflate_Row (Row : in out Variant_Row) is
-         use ztest;
-         Status : Z_Status;
-      begin
-         Z.Output_Next := Row'Address;
-         Z.Output_Available := Variant_Row'Size / Stream_Element'Size;
-         Status := Inflate (Z, Z_Flush_None);
-         Assert (Status = Z_Status_Ok, Status'Img);
-      end;
-
-      procedure Inflate_Last_Row (Row : in out Variant_Row) is
-         use ztest;
-         Status : Z_Status;
-      begin
-         Z.Output_Next := Row'Address;
-         Z.Output_Available := Variant_Row'Size / Stream_Element'Size;
-         Status := Inflate (Z, Z_Flush_None);
-         Assert (Status = Z_Status_Stream_End, Status'Img);
-      end;
-
-      procedure Reconstruct_Row (F : PNG_Filter_Type; Previous : Variant_Row; Next : in out Variant_Row) is
-         Data_Previous : Stream_Element_Array (1 .. Variant_Row'Size / Stream_Element'Size) with Address => Previous'Address;
-         Data_Next : Stream_Element_Array (1 .. Variant_Row'Size / Stream_Element'Size) with Address => Next'Address;
-      begin
-         Reconstruction_Procedure (F, Stream_Element_Offset (Pixel_Depth_Byte), Data_Previous, Data_Next);
-      end;
-
-      Zero_Row : constant Variant_Row := (others => (others => 0));
-      Filter : PNG_Filter_Type;
-      Row_Array : Variant_Row_Array with Address => Pixmap'Address;
-
+   procedure Generic_Reconstruct (Filter : PNG_Filter_Type; Previous : in Row; Next : in out Row) is
+      subtype Byte_Array is PNG_Byte_Array (1 .. Row'Size / PNG_Byte'Size);
+      Byte_Array_Previous : Byte_Array with Address => Previous'Address;
+      Byte_Array_Next : Byte_Array with Address => Next'Address;
    begin
-      Assert (Row_Array'Size = Pixmap'Size);
-
-      Inflate_Filter_Type (Filter);
-      Ada.Text_IO.Put_Line (Filter'Img);
-      Inflate_Row (Row_Array (1));
-      Reconstruct_Row (Filter, Zero_Row, Row_Array (1));
-
-      for I in Row_Array'First + 1 .. Row_Array'Last - 1 loop
-         Inflate_Filter_Type (Filter);
-         Ada.Text_IO.Put_Line (Filter'Img);
-         Inflate_Row (Row_Array (I));
-         Reconstruct_Row (Filter, Row_Array (I - 1), Row_Array (I));
-      end loop;
-
-      Inflate_Filter_Type (Filter);
-      Ada.Text_IO.Put_Line (Filter'Img);
-      Inflate_Last_Row (Row_Array (Row_Array'Last));
-      Reconstruct_Row (Filter, Row_Array (Row_Array'Last - 1), Row_Array (Row_Array'Last));
+      Run_Filter_Method_Zero (Filter, Pixel'Size / PNG_Byte'Size, Byte_Array_Previous, Byte_Array_Next);
    end;
 
 
-   procedure Inflate_All (IDAT : Stream_Element_Array; Width : PNG_Width; Height : PNG_Height; Pixel_Byte_Depth : PNG_Pixel_Byte_Depth; Pixmap : out Stream_Element_Array) is
+   procedure Generic_Decode_Row (Z : in out ztest.Z_Native_Stream; Previous : in Row; Current : out Row) is
       use ztest;
-      Z : Z_Native_Stream;
+      function Inflate is new ztest.Generic_Inflate (Row);
+      procedure Reconstruct is new Generic_Reconstruct (Index, Pixel, Row);
+      function Inflate is new ztest.Generic_Inflate (PNG_Filter_Type);
+      Status : Z_Status;
+      Filter : PNG_Filter_Type;
    begin
-      Initialize_Inflate (Z, 15);
-      Set_Next_Input (Z, IDAT);
-      Inflate_All (Z, Width, Height, Pixel_Byte_Depth, Pixmap);
+      Status := Inflate (Z, Filter, Z_Flush_None);
+      Assert (Status = Z_Status_Ok, "Inflate filter. Status = " & Status'Img);
+      Status := Inflate (Z, Current, Z_Flush_None);
+      Assert (Status = Z_Status_Ok, "Inflate current row. Status = " & Status'Img);
+      Reconstruct (Filter, Previous, Current);
    end;
+
 
 end Home_Pictures.PNG.Decode1;

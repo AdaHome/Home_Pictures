@@ -15,24 +15,18 @@ package body Home_Pictures.PNG is
       return R;
    end;
 
-   procedure Update1 (Item : in out GNAT.CRC32.CRC32; Value : System.Address; Size : Natural) is
+   procedure CRC32_Update_Memory (Item : in out GNAT.CRC32.CRC32; Value : System.Address; Size : Natural) is
       Count : Stream_Element_Count := Stream_Element_Count (Size / System.Storage_Unit);
       B : Stream_Element_Array (1 .. Count) with Address => Value;
    begin
       GNAT.CRC32.Update (Item, B);
    end;
 
-   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Data_IHDR) is
+   procedure CRC32_Update_Data_IHDR (Item : in out GNAT.CRC32.CRC32; Value : PNG_Data_IHDR) is
       B : Stream_Element_Array (0 .. 12) with Address => Value'Address;
    begin
       GNAT.CRC32.Update (Item, B);
-   end Update;
-
-   procedure Update (Item : in out GNAT.CRC32.CRC32; Value : Unsigned_32) is
-      B : Stream_Element_Array (0 .. 3) with Address => Value'Address;
-   begin
-      GNAT.CRC32.Update (Item, B);
-   end Update;
+   end;
 
    procedure Update (Item : in out GNAT.CRC32.CRC32; Value : PNG_Chunk_Kind) is
       B : Stream_Element_Array (0 .. 3) with Address => Value'Address;
@@ -117,7 +111,7 @@ package body Home_Pictures.PNG is
       -- These assertion fails if the PNG stream is corrupted.
 
       PNG_Data_IHDR'Read (Streamer, Item);
-      Update (Calculated_Checksum, Item);
+      CRC32_Update_Data_IHDR (Calculated_Checksum, Item);
       Read_Chunk_End (Streamer, Calculated_Checksum);
       Swap_Byte_Order (Item);
    end;
@@ -150,7 +144,7 @@ package body Home_Pictures.PNG is
       case Kind is
          when PNG_Chunk_Kind_IHDR =>
             PNG_Data_IHDR'Read (Streamer, Item.Data_IHDR);
-            Update1 (Checksum, Item.Data_IHDR'Address, Item.Data_IHDR'Size);
+            CRC32_Update_Memory (Checksum, Item.Data_IHDR'Address, Item.Data_IHDR'Size);
             Read_Chunk_End (Streamer, Checksum);
             Swap_Byte_Order (Item.Data_IHDR);
 
@@ -183,13 +177,13 @@ package body Home_Pictures.PNG is
 
    function Find_Pixel_Byte_Depth (Color_Kind : PNG_Color_Kind; Bit_Depth : PNG_Bit_Depth) return PNG_Pixel_Byte_Depth is
       Channel_Count : PNG_Channel_Count;
-      Pixel_Depth_Bit : Unsigned_32;
-      Pixel_Depth_Byte : Unsigned_32;
+      Pixel_Bit_Depth : PNG_Pixel_Bit_Depth;
+      Pixel_Byte_Depth : PNG_Pixel_Byte_Depth;
    begin
       Channel_Count := Find_Channel_Count (Color_Kind);
-      Pixel_Depth_Bit := PNG_Bit_Depth'Enum_Rep (Bit_Depth) * Channel_Count;
-      Pixel_Depth_Byte := Shift_Right (Pixel_Depth_Bit + 7, 3);
-      return Pixel_Depth_Byte;
+      Pixel_Bit_Depth := PNG_Bit_Depth'Enum_Rep (Bit_Depth) * Channel_Count;
+      Pixel_Byte_Depth := PNG_Byte_Count (Shift_Right (PNG_Byte_Count'Base (Pixel_Bit_Depth) + 7, 3)); --???
+      return Pixel_Byte_Depth;
    end;
 
 

@@ -2,16 +2,16 @@ with ztest;
 
 package Home_Pictures.PNG.Decode1 is
 
-   procedure Inflate_All
-     (Z : in out ztest.Z_Native_Stream;
-      Width : PNG_Width;
-      Height : PNG_Height;
-      Pixel_Depth_Byte : PNG_Pixel_Byte_Depth;
-      Pixmap : out Stream_Element_Array);
+   procedure Put_Base (Value : PNG_Byte; Width : Natural; Base : Positive);
+   procedure Put_Base_Array (Item : Ada.Streams.Stream_Element_Array; Width : Natural; Base : Positive; Column : Positive);
 
 
-   procedure Inflate_All (IDAT : Stream_Element_Array; Width : PNG_Width; Height : PNG_Height; Pixel_Byte_Depth : PNG_Pixel_Byte_Depth; Pixmap : out Stream_Element_Array);
-   -- Creates a zstream and uncompresses the IDAT to pixmap.
-   -- No data is allocated.
+   procedure Initialize (Z : in out ztest.Z_Native_Stream; IDAT : Stream_Element_Array);
+
+   generic
+      type Index is (<>);
+      type Pixel is private;
+      type Row is array (Index) of Pixel;
+   procedure Generic_Decode_Row (Z : in out ztest.Z_Native_Stream; Previous : in Row; Current : out Row);
 
 end Home_Pictures.PNG.Decode1;

@@ -167,9 +167,36 @@ package Home_Pictures.PNG is
    -- PNG_Greyscale_With_Alpha  = 4 | 8,          16      | Each pixel is a grayscale sample, followed by an alpha sample.
    -- PNG_Truecolour_With_Alpha = 6 | 8,          16      | Each pixel is an R,G,B triple,followed by an alpha sample.
 
+   type PNG_Byte is new Unsigned_8;
+   type PNG_Byte_Count is new Unsigned_32;
+   type PNG_Byte_Array is array (PNG_Byte_Count range <>) of PNG_Byte;
+
    subtype PNG_Pixel_Count is Unsigned_32;
-   subtype PNG_Pixel_Byte_Depth is Unsigned_32;
-   subtype PNG_Channel_Count is Unsigned_32;
+   subtype PNG_Pixel_Bit_Depth is Unsigned_32;
+   subtype PNG_Channel_Count is Unsigned_32 range 1 .. 4;
+
+   subtype PNG_Pixel_Byte_Depth is PNG_Byte_Count range 1 .. 8;
+   -- Max pixel size is (16bit=2bytes) times 4 channels equal 8.
+
+
+
+   subtype PNG_Sample_Depth is PNG_Byte_Count range 1 .. 2;
+   type PNG_Sample is array (PNG_Sample_Depth range <>) of PNG_Byte;
+   subtype PNG_Sample_8 is PNG_Sample (PNG_Sample_Depth range 1 .. 1);
+   subtype PNG_Sample_16 is PNG_Sample (PNG_Sample_Depth range 1 .. 2);
+   -- Pixels are always packed into scanlines with no wasted bits between pixels.
+   -- Pixels smaller than a byte never cross byte boundaries;
+   -- they are packed into bytes with the leftmost pixel in the high-order bits of a byte,
+   -- the rightmost in the low-order bits.
+   -- Permitted bit depths and pixel types are restricted so that in all cases the packing is simple and efficient.
+   -- PNG permits multi-sample pixels only with 8- and 16-bit samples,
+   -- so multiple samples of a single pixel are never packed into one byte.
+   -- All 16-bit samples are stored in network byte order (MSB first).
+
+   type PNG_Sample_8_Array is array (Natural range <>) of PNG_Sample_8;
+   type PNG_Sample_16_Array is array (Natural range <>) of PNG_Sample_16;
+
+
 
    subtype PNG_Width is PNG_Pixel_Count;
    subtype PNG_Height is PNG_Pixel_Count;
