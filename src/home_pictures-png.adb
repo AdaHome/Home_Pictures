@@ -4,6 +4,7 @@ with Ada.Streams;
 with Ada.Text_IO; use Ada.Text_IO;
 with Ada.Unchecked_Deallocation;
 with Interfaces.C;
+with GNAT.Source_Info;
 -- http://www.libpng.org/pub/png/spec/1.2/PNG-Chunks.html
 
 package body Home_Pictures.PNG is
@@ -55,7 +56,11 @@ package body Home_Pictures.PNG is
    end;
 
 
-   procedure Read_Chunk_Begin (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Length : out Unsigned_32; Kind : out PNG_Chunk_Kind; Calculated_Checksum : out GNAT.CRC32.CRC32) is
+   procedure Read_Chunk_Begin
+     (Streamer : not null access Ada.Streams.Root_Stream_Type'Class;
+      Length : out PNG_Chunk_Size_Byte;
+      Kind : out PNG_Chunk_Kind;
+      Calculated_Checksum : out GNAT.CRC32.CRC32) is
    begin
       GNAT.CRC32.Initialize (Calculated_Checksum);
       Read (Streamer, Length);
@@ -96,30 +101,6 @@ package body Home_Pictures.PNG is
       -- TODO: Do not swap byte order on a network byte order machine.
    end;
 
-   procedure Read_First_Chunk (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Item : in out PNG_Data_IHDR) is
-      use Home_Pictures.Swaps;
-      use GNAT.CRC32;
-      Kind : PNG_Chunk_Kind;
-      --Kind_IHDR : constant PNG_Chunk_Kind := Create_Chunk_Kind ("IHDR");
-      Length : Unsigned_32;
-      Calculated_Checksum : CRC32;
-   begin
-      Read_Chunk_Begin (Streamer, Length, Kind, Calculated_Checksum);
-      Assert (Length = 13, "The first chunk length is invalid. First chunk must be 13 bytes long. This chunk length is" & Length'Img & "bytes long.");
-      Assert (Kind = PNG_Chunk_Kind_IHDR, "The first chunk kind is invalid. The chunk kind must be IHDR. This chunk kind is" & Kind'Img & ".");
-      -- The PNG_Chunk_Data_IHDR must appear first and be 13 bytes.
-      -- These assertion fails if the PNG stream is corrupted.
-
-      PNG_Data_IHDR'Read (Streamer, Item);
-      CRC32_Update_Data_IHDR (Calculated_Checksum, Item);
-      Read_Chunk_End (Streamer, Calculated_Checksum);
-      Swap_Byte_Order (Item);
-   end;
-
-
-
-
-
    procedure Skip (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Count : Ada.Streams.Stream_Element_Count; Checksum : in out GNAT.CRC32.CRC32) is
       E : Stream_Element;
    begin
@@ -139,27 +120,45 @@ package body Home_Pictures.PNG is
       Read_Chunk_End (Streamer, Checksum);
    end;
 
-   procedure Read_Chunk_End_Header (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Item : out PNG_Complete_Fixed_Header; Length : Unsigned_32; Kind : PNG_Chunk_Kind; Checksum : in out GNAT.CRC32.CRC32) is
+   procedure Read_Chunk_End_Rubbish (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Length : Unsigned_32; Kind : PNG_Chunk_Kind; Checksum : in out GNAT.CRC32.CRC32) is
    begin
-      case Kind is
-         when PNG_Chunk_Kind_IHDR =>
-            PNG_Data_IHDR'Read (Streamer, Item.Data_IHDR);
-            CRC32_Update_Memory (Checksum, Item.Data_IHDR'Address, Item.Data_IHDR'Size);
-            Read_Chunk_End (Streamer, Checksum);
-            Swap_Byte_Order (Item.Data_IHDR);
-
-         when PNG_Chunk_Kind_IEND =>
-            Assert (Length = 0);
-            Read_Chunk_End (Streamer, Checksum);
-
-         when others =>
-            Skip (Streamer, Stream_Element_Count (Length), Checksum);
-            Read_Chunk_End (Streamer, Checksum);
-
-      end case;
+      Skip (Streamer, Stream_Element_Count (Length), Checksum);
+      Read_Chunk_End (Streamer, Checksum);
    end;
 
+   procedure Read_Whole_Chunk_IHDR (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Item : out PNG_Data_IHDR) is
+      Length : Unsigned_32;
+      Checksum : GNAT.CRC32.CRC32;
+      Kind : PNG_Chunk_Kind;
+   begin
+      Read_Chunk_Begin (Streamer, Length, Kind, Checksum);
+      Assert (Kind = PNG_Chunk_Kind_IHDR);
+      Assert (Length = Item'Size / System.Storage_Unit);
+      Assert (Length = 13, "The first chunk length is invalid. First chunk must be 13 bytes long. This chunk length is" & Length'Img & "bytes long.");
+      Assert (Kind = PNG_Chunk_Kind_IHDR, "The first chunk kind is invalid. The chunk kind must be IHDR. This chunk kind is" & Kind'Img & ".");
+      -- The PNG_Chunk_Data_IHDR must appear first and be 13 bytes.
+      -- These assertion fails if the PNG stream is corrupted.
 
+      PNG_Data_IHDR'Read (Streamer, Item);
+      CRC32_Update_Memory (Checksum, Item'Address, Item'Size);
+      Read_Chunk_End (Streamer, Checksum);
+      Swap_Byte_Order (Item);
+   end Read_Whole_Chunk_IHDR;
+
+   procedure Read_Whole_Chunk_Arbitrary
+     (Streamer : not null access Ada.Streams.Root_Stream_Type'Class;
+      Kind : out PNG_Chunk_Kind;
+      Buffer : out Stream_Element_Array;
+      Last : out Stream_Element_Offset) is
+      Length : Unsigned_32;
+      Checksum : GNAT.CRC32.CRC32;
+      use GNAT.Source_Info;
+   begin
+      Read_Chunk_Begin (Streamer, Length, Kind, Checksum);
+      Last := Buffer'First + Stream_Element_Count (Length) - 1;
+      Assert (Last <= Buffer'Last);
+      Read_Chunk_End_Arbitrary (Streamer, Buffer (Buffer'First .. Last), Checksum);
+   end Read_Whole_Chunk_Arbitrary;
 
    function Find_Channel_Count (Item : PNG_Color_Kind) return PNG_Channel_Count is
    begin
@@ -184,6 +183,19 @@ package body Home_Pictures.PNG is
       Pixel_Bit_Depth := PNG_Bit_Depth'Enum_Rep (Bit_Depth) * Channel_Count;
       Pixel_Byte_Depth := PNG_Byte_Count (Shift_Right (PNG_Byte_Count'Base (Pixel_Bit_Depth) + 7, 3)); --???
       return Pixel_Byte_Depth;
+   end;
+
+   function Convert (Bit_Depth : PNG_Bit_Depth) return PNG_Sample_Depth is
+      Sample_Depth : PNG_Sample_Depth;
+   begin
+      Sample_Depth := PNG_Byte_Count (Shift_Right (PNG_Byte_Count'Base (PNG_Bit_Depth'Enum_Rep (Bit_Depth)) + 7, 3)); --???
+      return Sample_Depth;
+   end;
+
+
+   function Calculate_Row_Size (Width : PNG_Width; Channel_Count : PNG_Channel_Count; Sample_Depth : PNG_Sample_Depth) return PNG_Row_Size is
+   begin
+      return PNG_Row_Size (Width) * PNG_Row_Size(Channel_Count) * PNG_Row_Size (Sample_Depth);
    end;
 
 

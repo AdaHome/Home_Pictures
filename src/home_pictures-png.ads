@@ -174,6 +174,9 @@ package Home_Pictures.PNG is
    subtype PNG_Pixel_Count is Unsigned_32;
    subtype PNG_Pixel_Bit_Depth is Unsigned_32;
    subtype PNG_Channel_Count is Unsigned_32 range 1 .. 4;
+   subtype PNG_Row_Index is Unsigned_32;
+   subtype PNG_Column_Index is Unsigned_32;
+   subtype PNG_Row_Size is PNG_Byte_Count;
 
    subtype PNG_Pixel_Byte_Depth is PNG_Byte_Count range 1 .. 8;
    -- Max pixel size is (16bit=2bytes) times 4 channels equal 8.
@@ -197,11 +200,20 @@ package Home_Pictures.PNG is
    type PNG_Sample_16_Array is array (Natural range <>) of PNG_Sample_16;
 
 
-
    subtype PNG_Width is PNG_Pixel_Count;
    subtype PNG_Height is PNG_Pixel_Count;
    -- Width and height give the image dimensions in pixels.
    -- They are 4-byte integers. Zero is an invalid value.
+
+   PNG_Pixmap_Width : constant := 1;
+   PNG_Pixmap_Height : constant := 2;
+   PNG_Pixmap_Channel_Count : constant := 3;
+   PNG_Pixmap_Sample_Depth : constant := 4;
+   type PNG_Pixmap is array
+     (PNG_Width range <>,
+      PNG_Height range <>,
+      PNG_Channel_Count range <>,
+      PNG_Sample_Depth range <>) of PNG_Byte;
 
 
    subtype PNG_Chunk_Size_Byte is Unsigned_32;
@@ -364,26 +376,50 @@ package Home_Pictures.PNG is
    -- Contains all constant size chunks data.
 
 
-
-
-   function Create_Chunk_Kind_32 (Item : PNG_Chunk_Kind_String) return Unsigned_32;
-
-
-   procedure Read (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Item : out Unsigned_32);
-   -- Read a Unsigned_32 and convert it to network byte order.
-
-
-   procedure Read_Chunk_Begin (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Length : out Unsigned_32; Kind : out PNG_Chunk_Kind; Calculated_Checksum : out GNAT.CRC32.CRC32);
+   procedure Read_Chunk_Begin
+     (Streamer            : not null access Ada.Streams.Root_Stream_Type'Class;
+      Length              : out PNG_Chunk_Size_Byte;
+      Kind                : out PNG_Chunk_Kind;
+      Calculated_Checksum : out GNAT.CRC32.CRC32);
    -- Read chunk length and chunk kind and begin crc32 calculation.
    -- All integers read that require more than one byte are converted to network byte order.
    -- This procedure is used to clarify that the beginning of the chunk is being read.
 
-   procedure Read_Chunk_End_Arbitrary (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Data : out Stream_Element_Array; Checksum : in out GNAT.CRC32.CRC32);
-   procedure Read_Chunk_End_Header (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Item : out PNG_Complete_Fixed_Header; Length : Unsigned_32; Kind : PNG_Chunk_Kind; Checksum : in out GNAT.CRC32.CRC32);
 
-   procedure Read_Chunk_End (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Calculated_Checksum : GNAT.CRC32.CRC32);
+   procedure Read_Chunk_End
+     (Streamer            : not null access Ada.Streams.Root_Stream_Type'Class;
+      Calculated_Checksum : GNAT.CRC32.CRC32);
    -- Read checksum and assert calculated checksum with checksum.
    -- This procedure is used to clarify that the end of the chunk is being read.
+
+
+   procedure Read_Chunk_End_Arbitrary
+     (Streamer            : not null access Ada.Streams.Root_Stream_Type'Class;
+      Data                : out Stream_Element_Array; Checksum : in out GNAT.CRC32.CRC32);
+
+
+   procedure Read_Chunk_End_Rubbish
+     (Streamer            : not null access Ada.Streams.Root_Stream_Type'Class;
+      Length              : Unsigned_32; Kind : PNG_Chunk_Kind;
+      Checksum            : in out GNAT.CRC32.CRC32);
+
+
+   procedure Read_Whole_Chunk_IHDR
+     (Streamer            : not null access Ada.Streams.Root_Stream_Type'Class;
+      Item                : out PNG_Data_IHDR);
+
+
+   procedure Read_Whole_Chunk_Arbitrary
+     (Streamer            : not null access Ada.Streams.Root_Stream_Type'Class;
+      Kind                : out PNG_Chunk_Kind;
+      Buffer              : out Stream_Element_Array;
+      Last                : out Stream_Element_Offset);
+   -- Can read any chunk but the buffer need to be big enough for the chunk.
+
+
+
+
+
 
 
    procedure Read_Signature (Streamer : not null access Ada.Streams.Root_Stream_Type'Class);
@@ -394,17 +430,14 @@ package Home_Pictures.PNG is
    -- consisting of a series of chunks beginning with an IHDR chunk and ending with an IEND chunk.
 
 
-   procedure Read_First_Chunk (Streamer : not null access Ada.Streams.Root_Stream_Type'Class; Item : in out PNG_Data_IHDR);
-   -- IHDR must appear first. This must be read directly after Read_Signature.
-   -- Raises exception on PNG datastream corruption.
-
-   procedure Swap_Byte_Order (Item : in out PNG_Data_IHDR);
-   -- Swap byte order for integer larger than 8 bit.
-   -- This need to be replaced to a cross compatable.
-
-
    function Find_Channel_Count (Item : PNG_Color_Kind) return PNG_Channel_Count;
    function Find_Pixel_Byte_Depth (Color_Kind : PNG_Color_Kind; Bit_Depth : PNG_Bit_Depth) return PNG_Pixel_Byte_Depth;
+   function Convert (Bit_Depth : PNG_Bit_Depth) return PNG_Sample_Depth;
+   function Calculate_Row_Size (Width : PNG_Width; Channel_Count : PNG_Channel_Count; Sample_Depth : PNG_Sample_Depth) return PNG_Row_Size;
+
+
+
+   function Create_Chunk_Kind_32 (Item : PNG_Chunk_Kind_String) return Unsigned_32;
 
 private
 

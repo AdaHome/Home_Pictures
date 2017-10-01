@@ -8,6 +8,8 @@ package Home_Pictures.PNG.Decode1 is
 
    procedure Initialize (Z : in out ztest.Z_Native_Stream; IDAT : Stream_Element_Array);
 
+   procedure Run_Filter_Method_Zero (Filter : PNG_Filter_Type; Pixel_Depth : PNG_Pixel_Byte_Depth; Previous : in PNG_Byte_Array; Current : in out PNG_Byte_Array);
+
    generic
       type Index is (<>);
       type Pixel is private;

@@ -74,6 +74,7 @@ package body Home_Pictures.PNG.Decode1 is
 
    procedure Run_Filter_Method_Zero (Filter : PNG_Filter_Type; Pixel_Depth : PNG_Pixel_Byte_Depth; Previous : in PNG_Byte_Array; Current : in out PNG_Byte_Array) is
    begin
+      Assert (Current'First + Pixel_Depth <= Current'Last, "Pixel_Depth =" & Pixel_Depth'Img & ". Current'Last " & Current'Last'Img);
       for I in Current'First .. Current'First + Pixel_Depth loop
          declare
             X : constant PNG_Byte := Current (I);
